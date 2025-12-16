@@ -7,9 +7,21 @@
  * - Explicitly sets width/height to match viewBox (trimming/cropping).
  * - Fills background to handle Tailwind class loss.
  */
-export async function exportToPng(svgElement: SVGSVGElement, scale = 1): Promise<void> {
+/**
+ * Exports an SVG element to the system clipboard as a PNG image.
+ * Uses a Canvas to rasterize the SVG at a high resolution.
+ * 
+ * FIX v22:
+ * - Accept optional backgroundColor.
+ * - Remove elements marked with data-export-ignore="true" (like selection rect).
+ */
+export async function exportToPng(svgElement: SVGSVGElement, scale = 1, backgroundColor = '#DCB35C'): Promise<void> {
     // 1. Clone the SVG to manipulate it without affecting the DOM
     const clone = svgElement.cloneNode(true) as SVGSVGElement;
+
+    // 1.5 Remove ignored elements (Selection Rect, etc.)
+    const ignoredElements = clone.querySelectorAll('[data-export-ignore="true"]');
+    ignoredElements.forEach(el => el.remove());
 
     // 2. Get the crop aspect ratio / dimensions from viewBox
     // App.tsx logic ensures viewBox is set correctly on the element passed here.
@@ -37,7 +49,7 @@ export async function exportToPng(svgElement: SVGSVGElement, scale = 1): Promise
     // 4. Handle Background Color
     // Tailwind classes (bg-[#DCB35C]) are LOST in serialization because stylesheets aren't inlined.
     // We explicitly set the style on the clone.
-    clone.style.backgroundColor = '#DCB35C';
+    clone.style.backgroundColor = backgroundColor;
 
     // 5. Serialize
     const serializer = new XMLSerializer();
@@ -63,7 +75,7 @@ export async function exportToPng(svgElement: SVGSVGElement, scale = 1): Promise
     if (!ctx) throw new Error('Could not get canvas context');
 
     // 8. Fill Background (Double Safety)
-    ctx.fillStyle = '#DCB35C';
+    ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // 9. Draw Image Scaled

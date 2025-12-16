@@ -45,6 +45,7 @@ function App() {
     const [showCoordinates, setShowCoordinates] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
     const [mode, setMode] = useState<PlacementMode>('SIMPLE');
+    const [isMonochrome, setIsMonochrome] = useState(false);
 
     // Drag State
     type DragMode = 'SELECTING' | 'MOVING_STONE';
@@ -160,7 +161,7 @@ function App() {
             const newColor = activeColor === 'BLACK' ? 'WHITE' : 'BLACK';
 
             // 2. Check for stone to swap at cursor
-            // If user double clicks a stone, they often want THAT stone to change color 
+            // If user double clicks a stone, they often want THAT stone to change color
             // AND the tool to switch.
             let newBoard = board;
             let boardChanged = false;
@@ -293,8 +294,8 @@ function App() {
 
     const handleExport = useCallback(async () => {
         // Scale 3 for Print Quality (approx 300dpi if original is 96dpi, but screens are varied. 3x is safe for print).
-        if (svgRef.current) await exportToPng(svgRef.current, 3);
-    }, []);
+        if (svgRef.current) await exportToPng(svgRef.current, 3, isMonochrome ? '#FFFFFF' : '#DCB35C');
+    }, [isMonochrome]);
 
     const handleExportSelection = useCallback(async () => {
         if (!svgRef.current || !selectionStart || !selectionEnd) return;
@@ -324,7 +325,7 @@ function App() {
         clone.setAttribute('width', `${width}`);
         clone.setAttribute('height', `${height}`);
 
-        await exportToPng(clone, 3);
+        await exportToPng(clone, 3, isMonochrome ? '#FFFFFF' : '#DCB35C');
 
         // Reset Selection
         setIsSelecting(false);
@@ -332,11 +333,37 @@ function App() {
         setSelectionEnd(null);
         setDragMode('SELECTING');
         setMoveSource(null);
-    }, [selectionStart, selectionEnd]);
+    }, [selectionStart, selectionEnd, isMonochrome]);
 
     // SGF Logic
-    const handleSaveSGF = () => {
+    const handleSaveSGF = async () => {
         const sgf = generateSGF(board, boardSize);
+
+        try {
+            // @ts-ignore - File System Access API
+            if (window.showSaveFilePicker) {
+                // @ts-ignore
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: `gorw_export_${Date.now()}.sgf`,
+                    types: [{
+                        description: 'Smart Game Format',
+                        accept: { 'application/x-go-sgf': ['.sgf'] },
+                    }],
+                });
+                const writable = await handle.createWritable();
+                await writable.write(sgf);
+                await writable.close();
+                return;
+            }
+        } catch (err) {
+            console.warn('Save File Picker failed or canceled', err);
+            // Fallback to auto-download if canceled or error?
+            // Usually if user canceled, we do nothing.
+            // If API not supported, we fall back.
+            if ((err as Error).name === 'AbortError') return;
+        }
+
+        // Fallback
         const blob = new Blob([sgf], { type: 'application/x-go-sgf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -384,7 +411,7 @@ function App() {
 
     // Actually, wait. loadSGF calls commitState.
     // commitState uses `history` variable.
-    // effect has no dependency on `history`? 
+    // effect has no dependency on `history`?
     // It will trap stale `history`.
     // Fix: use a Ref for history access or depend on history.
     // If we depend on history, we rebind paste listener every move. That's fine.
@@ -494,10 +521,19 @@ function App() {
                     <button onClick={handleRedo} disabled={currentMoveIndex === history.length - 1}
                         className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 font-bold">&gt;</button>
 
+                    {/* Open in New Tab */}
+                    <button
+                        onClick={() => window.open('index.html', '_blank')}
+                        className="ml-2 w-6 h-6 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold text-xs"
+                        title="Open in New Tab (Maximize)"
+                    >
+                        ↗
+                    </button>
+
                     {/* Help Button */}
                     <button
                         onClick={() => setShowHelp(true)}
-                        className="ml-2 w-6 h-6 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold text-xs"
+                        className="ml-1 w-6 h-6 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold text-xs"
                         title="Help"
                     >
                         ?
@@ -561,11 +597,25 @@ function App() {
                             </div>
                         </div>
                         <div className="mt-6 text-center text-xs text-gray-400">
-                            GORewrite v21
+                            GORewrite v22
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Toolbar above board regarding visual style */}
+            <div className="w-full flex justify-end mb-2 gap-2">
+                <button
+                    onClick={() => setIsMonochrome(!isMonochrome)}
+                    className={`text-xs px-2 py-1 rounded border shadow-sm transition-colors ${isMonochrome
+                        ? 'bg-gray-800 text-white border-gray-800'
+                        : 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200'
+                        }`}
+                    title="Toggle Monochrome (Printer Friendly)"
+                >
+                    {isMonochrome ? 'B/W Mode' : 'Color Mode'}
+                </button>
+            </div>
 
             {/* Board Container */}
             <div
@@ -578,6 +628,7 @@ function App() {
                     boardSize={boardSize}
                     viewRange={effectiveViewRange}
                     showCoordinates={showCoordinates}
+                    isMonochrome={isMonochrome}
                     onCellClick={handleCellClick}
                     onCellRightClick={handleCellRightClick}
                     onBoardWheel={handleWheel}

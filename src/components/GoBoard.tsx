@@ -22,12 +22,13 @@ export interface Stone {
 
 export type BoardState = (Stone | null)[][];
 
-interface GoBoardProps {
+export interface GoBoardProps {
     boardState: BoardState;
     boardSize: number; // 19, 13, 9
 
     viewRange?: ViewRange; // Optional now?
     showCoordinates?: boolean;
+    isMonochrome?: boolean;
 
     // Interactions
     onCellClick: (x: number, y: number) => void;
@@ -50,6 +51,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     boardSize,
     viewRange,
     showCoordinates = false,
+    isMonochrome = false,
     onCellClick,
     onCellRightClick,
     onBoardWheel,
@@ -287,6 +289,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
 
             selectionRect = (
                 <rect
+                    data-export-ignore="true"
                     x={sx} y={sy} width={w} height={h}
                     fill="rgba(0, 0, 255, 0.2)"
                     stroke="blue"
@@ -304,7 +307,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             height="100%"
             viewBox={viewBox}
             xmlns="http://www.w3.org/2000/svg"
-            className="bg-[#DCB35C] select-none"
+            className={`select-none ${isMonochrome ? 'bg-white' : 'bg-[#DCB35C]'}`}
             preserveAspectRatio="xMidYMid meet"
             onMouseUp={onDragEnd}
             onMouseLeave={onDragEnd}
