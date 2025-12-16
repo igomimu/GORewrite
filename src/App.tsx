@@ -513,7 +513,10 @@ function App() {
     return (
         <div className="p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none">
             <div className="flex justify-between w-full items-center mb-2">
-                <h1 className="text-xl font-bold text-gray-800">GORewrite</h1>
+                <div className="flex items-baseline gap-2">
+                    <h1 className="text-xl font-bold text-gray-800">GORewrite</h1>
+                    <span className="text-xs text-gray-400 font-normal">v22</span>
+                </div>
                 <div className="flex gap-2 items-center">
                     <button onClick={handleUndo} disabled={currentMoveIndex === 0}
                         className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 font-bold">&lt;</button>
