@@ -6,9 +6,15 @@
     - Added Undo logic (remove last stone) for Right-Click and Delete key.
 - **SGF Export**: Fixed bug where natural captures were exported as `AE` tags. Added `LB`, `TR`, `CR`, `SQ`, `MA` support.
 - **Hidden Move Legend**: Implemented support for Manual Labels. Fixed issue where footer/labels were missing due to unpassed props. Added **Auto-Detection for Setup Stones** (collisions with initial state now appear automatically as `(Init)`).
-    - **Update v32.0**: Switched to "Diff-based Detection" to robustly capture ALL hidden moves (Numbered, Simple/Unnumbered, Color Swaps) automatically.
-    - **Display**: Legend appears in a dedicated **Footer area below the board grid** (extending image height), matching the visual requirement.
-    - **Bug Fix**: Resolved issue where legends were duplicated endlessly due to reference equality checks. Now uses Deep Content Check (Color/Number) to only log actual changes.
+    - **Update v32.0**: Switched to "Diff-based Detection".
+    - **Update v33.0**:
+        - **凡例の分離**: 盤面との間隔を広げ(80px)、背景マスクを追加することで、盤の罫線と凡例が重ならないように完全に分離しました。
+        - **テキスト整理**: 凡例の「Init」という文字を削除し、石のみの表示に変更しました。
+        - **ロジック修正**: 重複検出の不具合を修正し、同色の石による上書き（意味のない重複）は凡例に出ないようにしました。
+- **ダブルクリック色変更**:
+    - **手数モード**: 最後に打った石をダブルクリックすると白黒が反転します。
+    - **配石(標準)モード**: 既にある石をダブルクリックすると、その石の色が反転し、手持ちの石の色もその色に変わります。
+- **UI簡略化**: 自動検出により手動ラベルが不要になったため、ツールボタン（●/A/★）を削除して画面をすっきりさせました。
 - **Double-Click Color Swap**:
     - **Numbered Mode**: Toggles last placed stone color.
     - **Stone (Simple) Mode**: Double-clicking an existing stone toggles its color immediately and updates the active tool color to matched the toggled color.

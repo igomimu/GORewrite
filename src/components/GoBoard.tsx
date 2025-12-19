@@ -161,7 +161,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         if (hiddenMoves.length > 0) {
             const rows = Math.ceil(hiddenMoves.length / 4);
             const footerHeight = rows * 40;
-            const footerSpacing = 50; // Spacing from board
+            const footerSpacing = 80; // Spacing from board (Matched with render)
             const footerPadding = 20; // Extra padding at bottom
             finalH += footerHeight + footerSpacing + footerPadding;
         }
@@ -447,15 +447,30 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 const validMaxY = Math.min(boardSize, maxY);
 
                 // Start Position: Below board (Footer)
+                // Increased spacing to 80px to strictly visually separate from board grid.
                 const startX = MARGIN + (validMinX - 1) * CELL_SIZE - CELL_SIZE / 2 + (showCoordinates ? -25 : 0) + 10;
-                const startY = MARGIN + (validMaxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 50;
+                const startY = MARGIN + (validMaxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 80;
 
                 const ITEM_SPACING = 120; // Space between each "N [M]" group
                 const RADIUS = 14;
                 const FONT = 12;
 
+                // Determine background color to mask any underlying grid lines (if viewing partial board)
+                const footerBg = isMonochrome ? 'white' : '#DCB35C';
+
                 return (
                     <g id="footer-group" transform={`translate(${startX}, ${startY})`}>
+                        {/* Background Mask: Hides grid lines if footer overlaps board area (in cropped view) */}
+                        {/* We cover the area starting from the "spacing" gap down to the bottom */}
+                        <rect
+                            x={-2000}
+                            y={-80} // Start from the top of the spacing gap
+                            width={4000}
+                            height={1000} // Sufficiently large
+                            fill={footerBg}
+                            stroke="none"
+                        />
+
                         {hiddenMoves.map((ref, i) => {
                             const x = (i % 4) * ITEM_SPACING;
                             const y = Math.floor(i / 4) * 40;

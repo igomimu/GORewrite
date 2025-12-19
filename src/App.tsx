@@ -497,13 +497,12 @@ function App() {
                     const prevStone = prevBoard[y][x];
                     const currStone = currBoard[y][x];
 
-                    // Detect Stone Placement (ignoring removal/captures)
-                    // USE DEEP CHECK: References might change due to deep copy of board matrix in some handlers.
-                    // We only want to record if the CONTENT of the stone changed (Color swap or Number increment).
-                    // If color and number are same, it's the same stone persisting.
-                    if (currStone && (!prevStone ||
-                        currStone.color !== prevStone.color ||
-                        currStone.number !== prevStone.number)) {
+                    // Detect Stone Placement
+                    // 1. If no previous stone (Empty -> Stone): Record it.
+                    // 2. If previous stone exists:
+                    //    - Only record if COLOR changes (e.g. White -> Black).
+                    //    - Ignore if same color (e.g. Init(B) -> 1(B)), effectively "using" the stone.
+                    if (currStone && (!prevStone || currStone.color !== prevStone.color)) {
 
                         const key = `${x},${y}`;
                         if (!moveHistory.has(key)) moveHistory.set(key, []);
@@ -533,10 +532,9 @@ function App() {
             }
         });
 
-        // Helper to format move text
         const getMoveText = (n: number) => {
             if (n > 0) return n.toString();
-            if (n === 0) return "Init";
+            if (n === 0) return ""; // Setup stone (No text, just visual stone)
             return ""; // Unnumbered / Simple stone
         };
 
@@ -571,7 +569,14 @@ function App() {
             } else {
                 // Single move case.
                 const m = moves[0];
-                const isVisible = currentStone && currentStone.number === m.number;
+                // Check visibility.
+                // For Numbered moves: number must match.
+                // For Setup/Simple moves (number=0 or undefined): check color and lack of number on current stone.
+                const isVisible = currentStone && (
+                    (m.number > 0 && currentStone.number === m.number) ||
+                    (m.number <= 0 && !currentStone.number && currentStone.color === m.color)
+                );
+
                 if (!isVisible) {
                     // It's hidden but NOT a collision (just captured).
                 }
@@ -1325,7 +1330,7 @@ function App() {
         <div className="p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none">
             <div className="flex justify-between w-full items-center mb-2">
                 <div className="flex items-baseline gap-2">
-                    <span className="text-xs text-gray-400 font-normal pl-1">v32.0</span>
+                    <span className="text-xs text-gray-400 font-normal pl-1">v33.0</span>
                 </div>
                 <div className="flex gap-2 items-center">
                     {/* Hidden Input for Open SGF */}
