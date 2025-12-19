@@ -442,6 +442,26 @@ function App() {
 
         const moveHistory = new Map<string, { number: number, color: StoneColor }[]>(); // "x,y" -> list of moves
 
+        // 0. Scan Initial Board (Setup Stones)
+        // Setup stones are considered "Move 0" for collision detection.
+        const initialBoard = history[0].board;
+        const initSize = history[0].boardSize;
+        if (initialBoard) {
+            for (let y = 0; y < initSize; y++) {
+                for (let x = 0; x < initSize; x++) {
+                    const stone = initialBoard[y][x];
+                    // Only count stones valid at step 0 (Setup stones usually don't have numbers, or ignored?)
+                    // If we assume history[0] is pure setup.
+                    if (stone) {
+                        const key = `${x},${y}`;
+                        if (!moveHistory.has(key)) moveHistory.set(key, []);
+                        // Avoid duplicates if Setup Stone is treated as Move? No, Move 1 is distinct.
+                        moveHistory.get(key)?.push({ number: 0, color: stone.color });
+                    }
+                }
+            }
+        }
+
         // 1. Scan History to populate moveHistory
         for (let i = 1; i <= currentMoveIndex; i++) {
             const currBoard = history[i].board;
@@ -490,7 +510,7 @@ function App() {
                 // Manual Label takes precedence. List ALL moves at this spot.
                 moves.forEach(m => {
                     footer.push({
-                        left: { text: m.number.toString(), color: m.color },
+                        left: { text: m.number === 0 ? "Init" : m.number.toString(), color: m.color },
                         right: { text: manualLabel, color: m.color }
                     });
                 });
@@ -504,7 +524,7 @@ function App() {
                 // Add all moves at this spot to footer
                 moves.forEach(m => {
                     footer.push({
-                        left: { text: m.number.toString(), color: m.color },
+                        left: { text: m.number === 0 ? "Init" : m.number.toString(), color: m.color },
                         right: { text: label, color: m.color }
                     });
                 });
