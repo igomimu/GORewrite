@@ -148,8 +148,11 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
 
         // Add footer space for hidden moves
         if (hiddenMoves.length > 0) {
-            // Approx 20px height
-            finalH += 30;
+            const rows = Math.ceil(hiddenMoves.length / 4);
+            const footerHeight = rows * 40;
+            const footerSpacing = 50; // Spacing from board
+            const footerPadding = 20; // Extra padding at bottom
+            finalH += footerHeight + footerSpacing + footerPadding;
         }
 
         return `${finalX} ${finalY} ${finalW} ${finalH}`;
@@ -385,7 +388,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
 
                 // Start Position: Below board
                 const startX = MARGIN + (validMinX - 1) * CELL_SIZE - CELL_SIZE / 2 + (showCoordinates ? -25 : 0) + 10;
-                const startY = MARGIN + (validMaxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 20;
+                const startY = MARGIN + (validMaxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 50;
 
                 const ITEM_SPACING = 120; // Space between each "N [M]" group
                 const RADIUS = 14;
