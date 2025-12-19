@@ -230,12 +230,15 @@ function App() {
             setHistory(newHistory);
             return;
         } else {
-            // Numbered Mode: Destructive Delete of current History
-            // Just like Delete Key
-            if (currentMoveIndex > 0) {
-                const newHistory = history.slice(0, currentMoveIndex);
-                setHistory(newHistory);
-                setCurrentMoveIndex(newHistory.length - 1);
+            // Numbered Mode
+            const stone = board[y - 1][x - 1];
+            // Check if it's the LAST numbered move
+            if (stone && stone.number === nextNumber - 1) {
+                if (currentMoveIndex > 0) {
+                    const newHistory = history.slice(0, currentMoveIndex);
+                    setHistory(newHistory);
+                    setCurrentMoveIndex(newHistory.length - 1);
+                }
             }
         }
     };
@@ -279,16 +282,9 @@ function App() {
             return;
         }
 
-        // Priority 3: Stone Swap (Numbered Mode)
-        if (hoveredCellRef.current) {
-            const { x, y } = hoveredCellRef.current;
-            const stone = board[y - 1][x - 1];
-            if (stone) {
-                const newBoard = board.map(row => [...row]);
-                newBoard[y - 1][x - 1] = { ...stone, color: stone.color === 'BLACK' ? 'WHITE' : 'BLACK' };
-                commitState(newBoard, nextNumber, activeColor, boardSize);
-                return;
-            }
+        // Priority 3: Stone Swap (Numbered Mode) - DISABLED requested by user
+        if (mode === 'NUMBERED') {
+            return;
         }
     };
 
@@ -1492,6 +1488,10 @@ function App() {
                         onClick={() => {
                             setMode('NUMBERED');
                             setToolMode('STONE');
+                            // Force Black
+                            const newHistory = [...history];
+                            newHistory[currentMoveIndex] = { ...newHistory[currentMoveIndex], activeColor: 'BLACK' };
+                            setHistory(newHistory);
                         }}
                     >
                         <svg width="24" height="24" viewBox="0 0 24 24" className="text-black">
