@@ -1265,7 +1265,7 @@ function App() {
         <div className="p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none">
             <div className="flex justify-between w-full items-center mb-2">
                 <div className="flex items-baseline gap-2">
-                    <span className="text-xs text-gray-400 font-normal pl-1">v31.1</span>
+                    <span className="text-xs text-gray-400 font-normal pl-1">v32.0</span>
                 </div>
                 <div className="flex gap-2 items-center">
                     {/* Hidden Input for Open SGF */}
@@ -1409,8 +1409,63 @@ function App() {
                 </div>
             )}
 
-            {/* Toolbar above board regarding visual style */}
-            <div className="w-full flex justify-end mb-2 gap-2">
+            {/* Tool Mode & Visual Style Toolbar */}
+            <div className="w-full flex justify-between mb-2 gap-2 items-center">
+                {/* Left: Tool Modes */}
+                <div className="flex gap-2 bg-white p-1 rounded shadow-sm border">
+                    {/* Stone Mode */}
+                    <button
+                        onClick={() => setToolMode('STONE')}
+                        className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${toolMode === 'STONE' ? 'bg-blue-100 text-blue-600 font-bold ring-2 ring-blue-300' : 'text-gray-500 hover:bg-gray-100'}`}
+                        title="Stone Mode"
+                    >
+                        ●
+                    </button>
+
+                    {/* Label Mode */}
+                    <div className="flex items-center gap-1 border-l px-1 border-gray-200">
+                        <button
+                            onClick={() => setToolMode('LABEL')}
+                            className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${toolMode === 'LABEL' ? 'bg-blue-100 text-blue-600 font-bold ring-2 ring-blue-300' : 'text-gray-500 hover:bg-gray-100'}`}
+                            title="Label Mode (Alpha)"
+                        >
+                            A
+                        </button>
+                        {toolMode === 'LABEL' && (
+                            <input
+                                type="text"
+                                maxLength={1}
+                                className="w-8 h-8 text-center border rounded text-sm uppercase font-bold"
+                                value={nextLabelChar}
+                                onChange={(e) => setNextLabelChar(e.target.value.toUpperCase() || 'A')}
+                                title="Next Label Character"
+                            />
+                        )}
+                    </div>
+
+                    {/* Symbol Mode */}
+                    <div className="flex items-center gap-1 border-l px-1 border-gray-200">
+                        <button
+                            onClick={() => setToolMode('SYMBOL')}
+                            className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${toolMode === 'SYMBOL' ? 'bg-blue-100 text-blue-600 font-bold ring-2 ring-blue-300' : 'text-gray-500 hover:bg-gray-100'}`}
+                            title="Symbol Mode"
+                        >
+                            ★
+                        </button>
+                        {toolMode === 'SYMBOL' && (
+                            <select
+                                className="h-8 border rounded text-xs px-1"
+                                value={selectedSymbol}
+                                onChange={(e) => setSelectedSymbol(e.target.value as any)}
+                            >
+                                <option value="TRI">△</option>
+                                <option value="CIR">○</option>
+                                <option value="SQR">□</option>
+                                <option value="X">×</option>
+                            </select>
+                        )}
+                    </div>
+                </div>
                 <button
                     onClick={() => setIsMonochrome(!isMonochrome)}
                     className={`text - xs px - 2 py - 1 rounded border shadow - sm transition - colors ${isMonochrome
