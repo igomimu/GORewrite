@@ -272,12 +272,33 @@ function App() {
             }
         }
 
-        // Priority 2: Setup Mode Color Toggle (Switch Tool)
+        // Priority 2: Setup Mode Color Toggle (Switch Tool & Stone)
+        // Satisfies: "On 2nd click, switch color, and keep that color."
         if (mode === 'SIMPLE' && toolMode === 'STONE') {
-            const newColor = activeColor === 'BLACK' ? 'WHITE' : 'BLACK';
+            let newColor: StoneColor = activeColor === 'BLACK' ? 'WHITE' : 'BLACK';
+            let newBoard = board;
+
+            // Check if there is a stone under cursor to swap
+            if (hoveredCellRef.current) {
+                const { x, y } = hoveredCellRef.current;
+                const stone = board[y - 1][x - 1];
+                if (stone) {
+                    // Toggle the color of the existing stone
+                    newColor = stone.color === 'BLACK' ? 'WHITE' : 'BLACK';
+                    newBoard = board.map(row => [...row]);
+                    newBoard[y - 1][x - 1] = { ...stone, color: newColor };
+                }
+            }
+
+            // Update History with new Board (if changed) and new Active Color
             const newHistory = [...history];
-            newHistory[currentMoveIndex] = { ...newHistory[currentMoveIndex], activeColor: newColor };
+            newHistory[currentMoveIndex] = {
+                ...newHistory[currentMoveIndex],
+                board: newBoard !== board ? newBoard : history[currentMoveIndex].board,
+                activeColor: newColor
+            };
             setHistory(newHistory);
+
             try { localStorage.setItem('gorw_active_color', newColor); } catch (e) { /* ignore */ }
             return;
         }
