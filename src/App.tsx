@@ -498,9 +498,13 @@ function App() {
                     const currStone = currBoard[y][x];
 
                     // Detect Stone Placement (ignoring removal/captures)
-                    // If current has stone, and it is DIFFERENT from prev (new object or new properties)
-                    // handleInteraction ensures untouched stones share references, so !== works.
-                    if (currStone && currStone !== prevStone) {
+                    // USE DEEP CHECK: References might change due to deep copy of board matrix in some handlers.
+                    // We only want to record if the CONTENT of the stone changed (Color swap or Number increment).
+                    // If color and number are same, it's the same stone persisting.
+                    if (currStone && (!prevStone ||
+                        currStone.color !== prevStone.color ||
+                        currStone.number !== prevStone.number)) {
+
                         const key = `${x},${y}`;
                         if (!moveHistory.has(key)) moveHistory.set(key, []);
 

@@ -8,6 +8,7 @@
 - **Hidden Move Legend**: Implemented support for Manual Labels. Fixed issue where footer/labels were missing due to unpassed props. Added **Auto-Detection for Setup Stones** (collisions with initial state now appear automatically as `(Init)`).
     - **Update v32.0**: Switched to "Diff-based Detection" to robustly capture ALL hidden moves (Numbered, Simple/Unnumbered, Color Swaps) automatically.
     - **Display**: Legend appears in a dedicated **Footer area below the board grid** (extending image height), matching the visual requirement.
+    - **Bug Fix**: Resolved issue where legends were duplicated endlessly due to reference equality checks. Now uses Deep Content Check (Color/Number) to only log actual changes.
 - **Double-Click Color Swap**:
     - **Numbered Mode**: Toggles last placed stone color.
     - **Stone (Simple) Mode**: Double-clicking an existing stone toggles its color immediately and updates the active tool color to matched the toggled color.
