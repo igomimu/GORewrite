@@ -282,8 +282,39 @@ function App() {
             return;
         }
 
-        // Priority 3: Stone Swap (Numbered Mode) - DISABLED requested by user
+        // Priority 3: Stone Swap (Numbered Mode) - Last Move Color Toggle
         if (mode === 'NUMBERED') {
+            if (hoveredCellRef.current) {
+                const { x, y } = hoveredCellRef.current;
+                const stone = board[y - 1][x - 1];
+                // Only allow modifying the *most recent* numbered move to avoid history corruption
+                if (stone && stone.number === nextNumber - 1 && currentMoveIndex > 0) {
+                    const prevStep = history[currentMoveIndex - 1];
+                    const prevBoard = prevStep.board.map(r => r.map(c => c ? { ...c } : null)); // Deep copy
+
+                    const newColor = stone.color === 'BLACK' ? 'WHITE' : 'BLACK';
+
+                    // Place new stone
+                    prevBoard[y - 1][x - 1] = { color: newColor, number: stone.number };
+
+                    // Recalculate captures
+                    const captured = checkCaptures(prevBoard, x - 1, y - 1, newColor);
+                    captured.forEach(c => prevBoard[c.y][c.x] = null);
+
+                    // Update History
+                    const newHistory = history.slice(0, currentMoveIndex);
+                    // Toggle active color state as well (if we placed Black, next was White. Now we place White, next should be Black).
+                    const nextActive = newColor === 'BLACK' ? 'WHITE' : 'BLACK';
+
+                    newHistory.push({
+                        ...history[currentMoveIndex],
+                        board: prevBoard,
+                        activeColor: nextActive
+                    });
+
+                    setHistory(newHistory);
+                }
+            }
             return;
         }
     };
@@ -403,6 +434,7 @@ function App() {
 
     // Generate hidden move references and special labels
     // Logic: Identify board locations with multiple moves (collisions).
+    // Update v32: Also identifying Manual Labels covering hidden moves.
     // Assign letters A, B, C... to those locations.
     // Footer lists all moves at those locations as "MoveNum [ Label ]".
     const { hiddenMoves, specialLabels } = useMemo(() => {
@@ -1417,6 +1449,7 @@ function App() {
                     specialLabels={specialLabels}
                     nextNumber={nextNumber}
                     activeColor={activeColor}
+                    markers={history[currentMoveIndex]?.markers || []}
                 />
 
                 {/* Float Controls: Zoom / Reset */}
