@@ -567,52 +567,45 @@ function App() {
         // Append Restored Stones
         const svgNS = "http://www.w3.org/2000/svg";
 
-        restoredStones.forEach(stone => {
-            if (stone.x < minX || stone.x > maxX || stone.y < minY || stone.y > maxY) return;
+        if (showCapturedInExport) {
+            restoredStones.forEach(stone => {
+                if (stone.x < minX || stone.x > maxX || stone.y < minY || stone.y > maxY) return;
 
-            const cx = MARGIN + (stone.x - 1) * CELL_SIZE;
-            const cy = MARGIN + (stone.y - 1) * CELL_SIZE;
+                const cx = MARGIN + (stone.x - 1) * CELL_SIZE;
+                const cy = MARGIN + (stone.y - 1) * CELL_SIZE;
 
-            const g = document.createElementNS(svgNS, 'g');
+                const g = document.createElementNS(svgNS, 'g');
 
-            const circle = document.createElementNS(svgNS, 'circle');
-            circle.setAttribute('cx', cx.toString());
-            circle.setAttribute('cy', cy.toString());
-            circle.setAttribute('r', '18.4');
-            circle.setAttribute('fill', stone.color === 'BLACK' ? 'black' : 'white');
-            circle.setAttribute('stroke', 'black');
-            circle.setAttribute('stroke-width', stone.color === 'BLACK' ? '2' : '0.7');
+                const circle = document.createElementNS(svgNS, 'circle');
+                circle.setAttribute('cx', cx.toString());
+                circle.setAttribute('cy', cy.toString());
+                circle.setAttribute('r', '18.4');
+                circle.setAttribute('fill', stone.color === 'BLACK' ? 'black' : 'white');
+                circle.setAttribute('stroke', 'black');
+                circle.setAttribute('stroke-width', stone.color === 'BLACK' ? '2' : '0.7');
 
-            const text = document.createElementNS(svgNS, 'text');
-            text.setAttribute('x', cx.toString());
-            text.setAttribute('y', cy.toString());
-            text.setAttribute('dy', '.35em');
-            text.setAttribute('text-anchor', 'middle');
-            text.setAttribute('fill', stone.color === 'BLACK' ? 'white' : 'black');
-            text.setAttribute('font-size', '26');
-            text.setAttribute('font-family', 'Arial, sans-serif');
-            text.setAttribute('font-weight', 'bold');
-            text.textContent = stone.text;
+                const text = document.createElementNS(svgNS, 'text');
+                text.setAttribute('x', cx.toString());
+                text.setAttribute('y', cy.toString());
+                text.setAttribute('dy', '.35em');
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('fill', stone.color === 'BLACK' ? 'white' : 'black');
+                text.setAttribute('font-size', '26');
+                text.setAttribute('font-family', 'Arial, sans-serif');
+                text.setAttribute('font-weight', 'bold');
+                text.textContent = stone.text;
 
-            g.appendChild(circle);
-            g.appendChild(text);
-            clone.appendChild(g);
-        });
+                g.appendChild(circle);
+                g.appendChild(text);
+                clone.appendChild(g);
+            });
+        }
 
         // Handle Footer (Hidden Moves Explanation)
         const footerGroup = clone.getElementById('footer-group');
         if (footerGroup) {
-            if (!showCapturedInExport) {
-                footerGroup.remove();
-            } else if (hiddenMoves.length > 0) {
+            if (hiddenMoves.length > 0) {
                 // Relocate Footer to be visible in the cropped view
-                // Align left with the crop: MARGIN + (minX - 1) * CELL_SIZE ... (minus half cell to align left edge)
-                // Actually GoBoard aligns it below the board.
-                // We want it aligned to the left of the crop? Or centered?
-                // GoBoard Logic: startX = MARGIN + (minX - 1) * CELL_SIZE - CELL_SIZE/2 + (coords?-25:0) + 10.
-                // This seems to align with the start of the view range.
-                // We will replicate this relative to `minX` of the export.
-
                 const startX = MARGIN + (minX - 1) * CELL_SIZE - CELL_SIZE / 2 + (showCoordinates ? -25 : 0) + 10;
                 // Add more vertical spacing (50px instead of 20px) to clearly separate from board
                 const startY = MARGIN + (maxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 50;
