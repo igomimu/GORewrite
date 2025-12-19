@@ -286,8 +286,8 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             if (stone) {
                 const isBlack = stone.color === 'BLACK';
                 const label = specialLabels.find(l => l.x === x && l.y === y)?.label;
-                // Prioritize number if present (User prefers "Black 1" over "Black A")
-                const displayText = stone.number?.toString() || label;
+                // Prioritize Label if present (e.g. for Setup Collisions "11 on A" -> Show A on board per user request)
+                const displayText = label || stone.number?.toString();
 
                 cells.push(
                     <g key={`s-group-${x}-${y}`} className="pointer-events-none">
@@ -451,9 +451,9 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 const startX = MARGIN + (validMinX - 1) * CELL_SIZE - CELL_SIZE / 2 + (showCoordinates ? -25 : 0) + 10;
                 const startY = MARGIN + (validMaxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 80;
 
-                const ITEM_SPACING = 130; // Space between each "N [M]" group
-                const RADIUS = 18; // Larger stones matching visual reference
-                const FONT = 16;
+                const ITEM_SPACING = 140; // Increased spacing for larger board-sized stones and text
+                const RADIUS = STONE_RADIUS; // Match board stone size exactly
+                const FONT = FONT_SIZE;      // Match board font size exactly
 
                 // Determine background color to mask any underlying grid lines (if viewing partial board)
                 const footerBg = isMonochrome ? 'white' : '#DCB35C';
@@ -481,18 +481,18 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                             return (
                                 <g key={`hm-${i}`} transform={`translate(${x}, ${y})`}>
                                     {/* Left Stone */}
-                                    <circle cx={15} cy={0} r={RADIUS} fill={lColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
-                                    <text x={15} y={0} dy=".35em" textAnchor="middle" fill={lColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="sans-serif" fontWeight="bold">{ref.left.text}</text>
+                                    <circle cx={20} cy={0} r={RADIUS} fill={lColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
+                                    <text x={20} y={0} dy=".35em" textAnchor="middle" fill={lColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{ref.left.text}</text>
 
                                     {/* Bracket Open */}
-                                    <text x={35} y={5} fontSize="16" fill="black" fontFamily="sans-serif">[</text>
+                                    <text x={50} y={8} fontSize="20" fill="black" fontFamily="sans-serif">[</text>
 
                                     {/* Right Stone (Label) */}
-                                    <circle cx={55} cy={0} r={RADIUS} fill={rColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
-                                    <text x={55} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="sans-serif" fontWeight="bold">{ref.right.text}</text>
+                                    <circle cx={80} cy={0} r={RADIUS} fill={rColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
+                                    <text x={80} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{ref.right.text}</text>
 
                                     {/* Bracket Close */}
-                                    <text x={75} y={5} fontSize="16" fill="black" fontFamily="sans-serif">]</text>
+                                    <text x={110} y={8} fontSize="20" fill="black" fontFamily="sans-serif">]</text>
                                 </g>
                             );
                         })}
