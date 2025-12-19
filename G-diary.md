@@ -7,7 +7,9 @@
 - **SGF Export**: Fixed bug where natural captures were exported as `AE` tags. Added `LB`, `TR`, `CR`, `SQ`, `MA` support.
 - **Hidden Move Legend**: Implemented support for Manual Labels. Fixed issue where footer/labels were missing due to unpassed props. Added **Auto-Detection for Setup Stones** (collisions with initial state now appear automatically as `(Init)`).
     - **Update v32.0**: Switched to "Diff-based Detection" to robustly capture ALL hidden moves (Numbered, Simple/Unnumbered, Color Swaps) automatically.
-    - **Overlay Display**: Legend now appears **inside the board** (Bottom Left Overlay) instead of increasing image height.
+    - **Display**: Legend appears in a dedicated **Footer area below the board grid** (extending image height), matching the visual requirement.
+- **Double-Click Color Swap**: In Numbered Mode, double-clicking the last placed stone toggles its color (Black/White).
+- **UI Restoration**: Restored missing Tool Mode buttons (Stone/Label/Symbol).
 - **Double-Click Color Swap**: In Numbered Mode, double-clicking the last placed stone toggles its color (Black/White).
 - **UI Restoration**: Restored missing Tool Mode buttons (Stone/Label/Symbol).
 - **UI Restoration**: Restored missing Tool Mode buttons (Stone/Label/Symbol).

@@ -157,7 +157,14 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             finalH += 50;
         }
 
-        // Footer is now an Overlay/Legend INSIDE the board, so no viewBox expansion needed.
+        // Add footer space for hidden moves (OUTSIDE the board grid)
+        if (hiddenMoves.length > 0) {
+            const rows = Math.ceil(hiddenMoves.length / 4);
+            const footerHeight = rows * 40;
+            const footerSpacing = 50; // Spacing from board
+            const footerPadding = 20; // Extra padding at bottom
+            finalH += footerHeight + footerSpacing + footerPadding;
+        }
 
         return `${finalX} ${finalY} ${finalW} ${finalH}`;
     }, [viewRange, showCoordinates, boardSize, hiddenMoves]);
@@ -439,61 +446,38 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 const validMinX = Math.max(1, minX);
                 const validMaxY = Math.min(boardSize, maxY);
 
-                // Start Position: Below board
-                // Legend Overlay Position (Bottom Left of the Board Area)
-                // Placed inside the board boundaries as requested.
-                const ITEM_SPACING = 90; // Compact spacing
-                const ROW_HEIGHT = 36;
-                const RADIUS = 12;
-                const FONT = 11;
+                // Start Position: Below board (Footer)
+                const startX = MARGIN + (validMinX - 1) * CELL_SIZE - CELL_SIZE / 2 + (showCoordinates ? -25 : 0) + 10;
+                const startY = MARGIN + (validMaxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 50;
 
-                const cols = 4;
-                const rows = Math.ceil(hiddenMoves.length / cols);
-
-                // Calculate position relative to the visible board area
-                // We place it at the bottom-left of the valid view range (or full board)
-                const viewBottomY = MARGIN + (validMaxY - 1) * CELL_SIZE;
-                const viewLeftX = MARGIN + (validMinX - 1) * CELL_SIZE;
-
-                // Adjust for coordinates padding if visible
-                const startX = viewLeftX + (showCoordinates ? 30 : 0);
-                // Position above bottom edge to be "Inside"
-                const startY = viewBottomY - (rows * ROW_HEIGHT) - 10 + (showCoordinates ? 20 : 0);
-
-                const bgWidth = Math.min(hiddenMoves.length, cols) * ITEM_SPACING + 10;
-                const bgHeight = rows * ROW_HEIGHT + 10;
+                const ITEM_SPACING = 120; // Space between each "N [M]" group
+                const RADIUS = 14;
+                const FONT = 12;
 
                 return (
-                    <g id="legend-overlay" transform={`translate(${startX}, ${startY})`}>
-                        {/* Background Box for readability */}
-                        <rect
-                            x={-5} y={-5}
-                            width={bgWidth}
-                            height={bgHeight}
-                            fill="rgba(255, 255, 255, 0.9)"
-                            stroke="#999"
-                            strokeWidth={1}
-                            rx={6}
-                        />
-
+                    <g id="footer-group" transform={`translate(${startX}, ${startY})`}>
                         {hiddenMoves.map((ref, i) => {
-                            const x = (i % cols) * ITEM_SPACING;
-                            const y = Math.floor(i / cols) * ROW_HEIGHT;
+                            const x = (i % 4) * ITEM_SPACING;
+                            const y = Math.floor(i / 4) * 40;
 
                             const lColor = ref.left.color;
                             const rColor = ref.right.color;
 
                             return (
-                                <g key={`hm-${i}`} transform={`translate(${x}, ${y + 15})`}>
+                                <g key={`hm-${i}`} transform={`translate(${x}, ${y})`}>
+                                    {/* Left Stone */}
                                     <circle cx={15} cy={0} r={RADIUS} fill={lColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
                                     <text x={15} y={0} dy=".35em" textAnchor="middle" fill={lColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="sans-serif" fontWeight="bold">{ref.left.text}</text>
 
-                                    <text x={33} y={4} fontSize="14" fill="#555" fontFamily="sans-serif" fontWeight="bold">[</text>
+                                    {/* Bracket Open */}
+                                    <text x={35} y={5} fontSize="16" fill="black" fontFamily="sans-serif">[</text>
 
-                                    <circle cx={50} cy={0} r={RADIUS} fill={rColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
-                                    <text x={50} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="sans-serif" fontWeight="bold">{ref.right.text}</text>
+                                    {/* Right Stone (Label) */}
+                                    <circle cx={55} cy={0} r={RADIUS} fill={rColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
+                                    <text x={55} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="sans-serif" fontWeight="bold">{ref.right.text}</text>
 
-                                    <text x={68} y={4} fontSize="14" fill="#555" fontFamily="sans-serif" fontWeight="bold">]</text>
+                                    {/* Bracket Close */}
+                                    <text x={75} y={5} fontSize="16" fill="black" fontFamily="sans-serif">]</text>
                                 </g>
                             );
                         })}
