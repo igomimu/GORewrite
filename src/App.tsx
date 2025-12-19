@@ -1401,6 +1401,8 @@ function App() {
                     onDragEnd={handleDragEnd}
                     hiddenMoves={hiddenMoves}
                     specialLabels={specialLabels}
+                    nextNumber={nextNumber}
+                    activeColor={activeColor}
                 />
 
                 {/* Float Controls: Zoom / Reset */}
