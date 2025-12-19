@@ -462,23 +462,31 @@ function App() {
             }
         }
 
-        // 1. Scan History to populate moveHistory
+        // 1. Scan History (Diff-based) to populate moveHistory
+        // Robustly detects any added stone (Numbered or Simple/Unnumbered) by comparing board states.
         for (let i = 1; i <= currentMoveIndex; i++) {
+            const prevBoard = history[i - 1]?.board;
             const currBoard = history[i].board;
             const size = history[i].boardSize;
-            const moveNum = history[i - 1].nextNumber; // The number of the stone just placed
 
-            // Find where this move was placed
-            // Optimization: We could store move coords in history, but we don't.
-            // Brute force scan is O(N * BoardSize^2). N ~ 200, BS=361. 72000 ops. Fast enough.
+            if (!prevBoard) continue; // Should not happen given i starts at 1
+
             for (let y = 0; y < size; y++) {
                 for (let x = 0; x < size; x++) {
-                    const stone = currBoard[y][x];
-                    if (stone && stone.number === moveNum) {
+                    const prevStone = prevBoard[y][x];
+                    const currStone = currBoard[y][x];
+
+                    // Detect Stone Placement (ignoring removal/captures)
+                    // If current has stone, and it is DIFFERENT from prev (new object or new properties)
+                    // handleInteraction ensures untouched stones share references, so !== works.
+                    if (currStone && currStone !== prevStone) {
                         const key = `${x},${y}`;
                         if (!moveHistory.has(key)) moveHistory.set(key, []);
-                        moveHistory.get(key)?.push({ number: moveNum, color: stone.color });
-                        // Found it.
+
+                        moveHistory.get(key)?.push({
+                            number: currStone.number ?? -1, // -1 indicating Unnumbered/Simple move
+                            color: currStone.color
+                        });
                     }
                 }
             }
@@ -500,6 +508,13 @@ function App() {
             }
         });
 
+        // Helper to format move text
+        const getMoveText = (n: number) => {
+            if (n > 0) return n.toString();
+            if (n === 0) return "Init";
+            return ""; // Unnumbered / Simple stone
+        };
+
         // We iterate all locations that had stones
         moveHistory.forEach((moves, key) => {
             const [x, y] = key.split(',').map(Number);
@@ -510,7 +525,7 @@ function App() {
                 // Manual Label takes precedence. List ALL moves at this spot.
                 moves.forEach(m => {
                     footer.push({
-                        left: { text: m.number === 0 ? "Init" : m.number.toString(), color: m.color },
+                        left: { text: getMoveText(m.number), color: m.color },
                         right: { text: manualLabel, color: m.color }
                     });
                 });
@@ -524,7 +539,7 @@ function App() {
                 // Add all moves at this spot to footer
                 moves.forEach(m => {
                     footer.push({
-                        left: { text: m.number === 0 ? "Init" : m.number.toString(), color: m.color },
+                        left: { text: getMoveText(m.number), color: m.color },
                         right: { text: label, color: m.color }
                     });
                 });
