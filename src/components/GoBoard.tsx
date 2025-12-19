@@ -36,6 +36,7 @@ export interface GoBoardProps {
     viewRange?: ViewRange; // Optional now?
     showCoordinates?: boolean;
     isMonochrome?: boolean;
+    prioritizeLabel?: boolean; // Toggle Number vs Label priority
 
     // Interactions
     onCellClick: (x: number, y: number) => void;
@@ -67,6 +68,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     viewRange,
     showCoordinates = false,
     isMonochrome = false,
+    prioritizeLabel = false,
     onCellClick,
     onCellRightClick,
     onBoardWheel,
@@ -286,8 +288,13 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             if (stone) {
                 const isBlack = stone.color === 'BLACK';
                 const label = specialLabels.find(l => l.x === x && l.y === y)?.label;
-                // Prioritize Label if present (e.g. for Setup Collisions "11 on A" -> Show A on board per user request)
-                const displayText = label || stone.number?.toString();
+
+                // Display Priority:
+                // If prioritizeLabel (Figure Mode) is true, show Label (A) if present.
+                // Otherwise (Operation Mode), show Number (11).
+                const displayText = prioritizeLabel
+                    ? (label || stone.number?.toString())
+                    : (stone.number?.toString() || label);
 
                 cells.push(
                     <g key={`s-group-${x}-${y}`} className="pointer-events-none">

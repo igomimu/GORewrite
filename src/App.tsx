@@ -71,7 +71,8 @@ function App() {
             return localStorage.getItem('gorw_is_monochrome') === 'true';
         } catch { return false; }
     });
-    const [showCapturedInExport, setShowCapturedInExport] = useState(true);
+    const [showCapturedInExport, setShowCapturedInExport] = useState(false);
+    const [isFigureMode, setIsFigureMode] = useState(false); // Toggle for "Figure Mode" (Show Labels A instead of Numbers on board)
 
     useEffect(() => {
         localStorage.setItem('gorw_is_monochrome', String(isMonochrome));
@@ -1399,6 +1400,15 @@ function App() {
                         👻
                     </button>
 
+                    {/* Figure Mode Toggle */}
+                    <button
+                        onClick={() => setIsFigureMode(!isFigureMode)}
+                        title={`Figure Mode (Show Labels 'A' on Board): ${isFigureMode ? 'ON' : 'OFF'}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center font-bold transition-colors ${isFigureMode ? 'bg-teal-100 text-teal-700 hover:bg-teal-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                    >
+                        Aa
+                    </button>
+
                     <div className="w-px h-6 bg-gray-300 mx-1"></div>
 
                     <button onClick={handleUndo} disabled={currentMoveIndex === 0} title="Undo"
@@ -1523,6 +1533,7 @@ function App() {
                     viewRange={effectiveViewRange}
                     showCoordinates={showCoordinates}
                     isMonochrome={isMonochrome}
+                    prioritizeLabel={isFigureMode}
                     onCellClick={handleInteraction}
                     onCellRightClick={handleRightClick}
                     onBoardWheel={handleWheel}
