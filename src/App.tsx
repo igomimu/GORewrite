@@ -58,10 +58,12 @@ function App() {
     const [viewRange, setViewRange] = useState<ViewRange | null>(null);
 
     // Calculated effective view range
+    // Calculated effective view range
     const effectiveViewRange: ViewRange = viewRange || { minX: 1, maxX: boardSize, minY: 1, maxY: boardSize };
     const isCropped = !!viewRange;
 
     const [showCoordinates, setShowCoordinates] = useState(false);
+    const [showNumbers, setShowNumbers] = useState(true);
     const [showHelp, setShowHelp] = useState(false);
     const [mode, setMode] = useState<PlacementMode>('SIMPLE');
 
@@ -72,6 +74,7 @@ function App() {
         } catch { return false; }
     });
     const [showCapturedInExport, setShowCapturedInExport] = useState(false);
+    const [isFigureMode, setIsFigureMode] = useState(false); // Internal State for Export Auto-Switch
 
     useEffect(() => {
         localStorage.setItem('gorw_is_monochrome', String(isMonochrome));
@@ -163,38 +166,58 @@ function App() {
         const newBoard = board.map(row => [...row]);
 
         if (mode === 'SIMPLE') {
-            // Simple mode: Edit "Initial/Base" state across timeline
-            // "No order memory" -> Do not create new history step.
-            // "Doesn't move with mouse toggle" -> Persist in all frames.
-            const newStone = { color: activeColor }; // No number
+            // Setup Mode (Simple)
+            // L-Click: Place BLACK. If overlapping (any color), DELETE.
+
+            if (currentStone && !currentStone.number) {
+                // DELETE overlapping setup stone
+                const newHistory = history.map(step => {
+                    const cell = step.board[y - 1][x - 1];
+                    if (cell && cell.number) return step; // Don't delete numbered items
+                    const stepBoard = step.board.map(row => [...row]);
+                    stepBoard[y - 1][x - 1] = null;
+                    return { ...step, board: stepBoard };
+                });
+                setHistory(newHistory);
+                return;
+            }
+
+            // If empty (or numbered stone which we shouldn't touch? Logic above says checked setup stone), Place BLACK
+            if (currentStone && currentStone.number) return; // Don't interact with numbered stones in setup mode? Or allow delete?
+            // "Click existing -> Delete" usually implies editing the Setup layer.
+            // If there is a numbered stone, we probably shouldn't edit it here.
+
+            const newStone = { color: 'BLACK' as StoneColor };
 
             const newHistory = history.map(step => {
-                // Determine if we should update this step
-                // Safety: Don't overwrite numbered moves (solution sequence)
-                // Use optional chaining for safety
                 const cell = step.board[y - 1][x - 1];
-                if (cell && cell.number) {
-                    return step; // Don't touch numbered moves
-                }
-
-                // Create new board for this step
+                if (cell && cell.number) return step;
                 const stepBoard = step.board.map(row => [...row]);
                 stepBoard[y - 1][x - 1] = newStone;
-
-                return {
-                    ...step,
-                    board: stepBoard
-                };
+                return { ...step, board: stepBoard };
             });
 
             setHistory(newHistory);
-            // Don't change currentMoveIndex
             return;
 
         } else {
-            // Numbered
-            if (currentStone) return; // Right click handles removal
+            // Numbered Mode
+            // L-Click: Place Number. If overlapping LAST numbered stone, DELETE (Undo).
 
+            if (currentStone) {
+                // If it is the LAST numbered move, Delete it (Undo Last Move)
+                if (currentStone.number === nextNumber - 1) {
+                    if (currentMoveIndex > 0) {
+                        const newHistory = history.slice(0, currentMoveIndex);
+                        setHistory(newHistory);
+                        setCurrentMoveIndex(newHistory.length - 1);
+                    }
+                    return;
+                }
+                return; // Ignore other stones (earlier moves or setup stones)
+            }
+
+            // Place Numbered Stone
             newBoard[y - 1][x - 1] = { color: activeColor, number: nextNumber };
 
             const captured = checkCaptures(newBoard, x - 1, y - 1, activeColor);
@@ -205,10 +228,6 @@ function App() {
             const newNextNum = nextNumber + 1;
             const newActiveColor = activeColor === 'BLACK' ? 'WHITE' : 'BLACK';
 
-            // Persist active color logic also here? 
-            // commitState handles it.
-            // But we pass newActiveColor to commitState.
-
             commitState(newBoard, newNextNum, newActiveColor, boardSize);
         }
     };
@@ -216,23 +235,47 @@ function App() {
     // New Right Click Handler
     const handleRightClick = (x: number, y: number) => {
         if (mode === 'SIMPLE') {
-            // Simple mode: Delete Initial/Base stone across timeline
+            // Setup Mode (Simple)
+            // R-Click: Place WHITE. If overlapping, DELETE.
+
+            const currentStone = board[y - 1][x - 1];
+
+            if (currentStone && !currentStone.number) {
+                // DELETE overlapping setup stone
+                const newHistory = history.map(step => {
+                    const cell = step.board[y - 1][x - 1];
+                    if (cell && cell.number) return step;
+                    const stepBoard = step.board.map(row => [...row]);
+                    stepBoard[y - 1][x - 1] = null;
+                    return { ...step, board: stepBoard };
+                });
+                setHistory(newHistory);
+                return;
+            }
+
+            if (currentStone && currentStone.number) return;
+
+            const newStone = { color: 'WHITE' as StoneColor };
+
             const newHistory = history.map(step => {
                 const cell = step.board[y - 1][x - 1];
-                // Only delete if it's NOT a numbered move
-                if (cell && cell.number) {
-                    return step;
-                }
+                if (cell && cell.number) return step;
                 const stepBoard = step.board.map(row => [...row]);
-                stepBoard[y - 1][x - 1] = null;
+                stepBoard[y - 1][x - 1] = newStone;
                 return { ...step, board: stepBoard };
             });
+
             setHistory(newHistory);
             return;
         } else {
             // Numbered Mode
+            // Right Click: Delete LAST numbered move (Undo shortcut), or Do Nothing?
+            // User requested: "Number stone is Left click only. Click again to delete."
+            // "Right click deletes stone" was in previous logic. 
+            // I will keep Right Click as "Undo Last" for convenience effectively same as "Delete", 
+            // but explicitly NO placement.
+
             const stone = board[y - 1][x - 1];
-            // Check if it's the LAST numbered move
             if (stone && stone.number === nextNumber - 1) {
                 if (currentMoveIndex > 0) {
                     const newHistory = history.slice(0, currentMoveIndex);
@@ -240,7 +283,8 @@ function App() {
                     setCurrentMoveIndex(newHistory.length - 1);
                 }
             }
-        }
+        };
+
     };
 
     // const handleCellClick = (x: number, y: number) => handleInteraction(x, y); // Removed: Use handleInteraction directly
@@ -287,17 +331,27 @@ function App() {
                     newColor = stone.color === 'BLACK' ? 'WHITE' : 'BLACK';
                     newBoard = board.map(row => [...row]);
                     newBoard[y - 1][x - 1] = { ...stone, color: newColor };
+
+                    // Propagate to ALL history steps (like handleInteraction)
+                    const newHistory = history.map(step => {
+                        const cell = step.board[y - 1][x - 1];
+                        // Don't overwrite numbered moves
+                        if (cell && cell.number) return step;
+
+                        const stepBoard = step.board.map(row => [...row]);
+                        stepBoard[y - 1][x - 1] = { color: newColor };
+                        return { ...step, board: stepBoard };
+                    });
+
+                    // Update Active Color for current step (consistency)
+                    newHistory[currentMoveIndex] = {
+                        ...newHistory[currentMoveIndex],
+                        activeColor: newColor
+                    };
+
+                    setHistory(newHistory);
                 }
             }
-
-            // Update History with new Board (if changed) and new Active Color
-            const newHistory = [...history];
-            newHistory[currentMoveIndex] = {
-                ...newHistory[currentMoveIndex],
-                board: newBoard !== board ? newBoard : history[currentMoveIndex].board,
-                activeColor: newColor
-            };
-            setHistory(newHistory);
 
             try { localStorage.setItem('gorw_active_color', newColor); } catch (e) { /* ignore */ }
             return;
@@ -350,6 +404,15 @@ function App() {
 
     const handleUndo = () => { if (currentMoveIndex > 0) setCurrentMoveIndex(i => i - 1); };
     const handleRedo = () => { if (currentMoveIndex < history.length - 1) setCurrentMoveIndex(i => i + 1); };
+
+    // Pass Move: Increments number, toggles color, board stays same
+    const handlePass = () => {
+        if (mode !== 'NUMBERED') return;
+        const newBoard = board.map(row => [...row]); // Copy current board
+        const newNextNumber = nextNumber + 1;
+        const newActiveColor = activeColor === 'BLACK' ? 'WHITE' : 'BLACK';
+        commitState(newBoard, newNextNumber, newActiveColor, boardSize);
+    };
     const handleWheel = (delta: number) => {
         if (Math.abs(delta) < 10) return;
         if (delta > 0) handleRedo(); else handleUndo();
@@ -379,14 +442,33 @@ function App() {
             const targetX = selectionEnd.x;
             const targetY = selectionEnd.y;
             if ((moveSource.x !== targetX || moveSource.y !== targetY) && !board[targetY - 1][targetX - 1]) {
-                const newBoard = board.map(row => [...row]);
-                const stone = newBoard[moveSource.y - 1][moveSource.x - 1];
-                if (stone) {
-                    newBoard[moveSource.y - 1][moveSource.x - 1] = null;
-                    newBoard[targetY - 1][targetX - 1] = stone;
-                    const captured = checkCaptures(newBoard, targetX - 1, targetY - 1, stone.color);
-                    captured.forEach(c => newBoard[c.y][c.x] = null);
-                    commitState(newBoard, nextNumber, activeColor, boardSize);
+                if (mode === 'SIMPLE') {
+                    // Simple Mode: Propagate move to ALL history steps
+                    const newHistory = history.map(step => {
+                        const sourceCell = step.board[moveSource.y - 1][moveSource.x - 1];
+                        const targetCell = step.board[targetY - 1][targetX - 1];
+
+                        // Only move if source has a setup stone (no number) and target is empty
+                        if (sourceCell && !sourceCell.number && !targetCell) {
+                            const stepBoard = step.board.map(row => [...row]);
+                            stepBoard[targetY - 1][targetX - 1] = sourceCell;
+                            stepBoard[moveSource.y - 1][moveSource.x - 1] = null;
+                            return { ...step, board: stepBoard };
+                        }
+                        return step;
+                    });
+                    setHistory(newHistory);
+                } else {
+                    // Numbered Mode
+                    const newBoard = board.map(row => [...row]);
+                    const stone = newBoard[moveSource.y - 1][moveSource.x - 1];
+                    if (stone) {
+                        newBoard[moveSource.y - 1][moveSource.x - 1] = null;
+                        newBoard[targetY - 1][targetX - 1] = stone;
+                        const captured = checkCaptures(newBoard, targetX - 1, targetY - 1, stone.color);
+                        captured.forEach(c => newBoard[c.y][c.x] = null);
+                        commitState(newBoard, nextNumber, activeColor, boardSize);
+                    }
                 }
             }
             setSelectionStart(null);
@@ -458,7 +540,7 @@ function App() {
     // Update v32: Also identifying Manual Labels covering hidden moves.
     // Assign letters A, B, C... to those locations.
     // Footer lists all moves at those locations as "MoveNum [ Label ]".
-    const { hiddenMoves, specialLabels } = useMemo(() => {
+    const hiddenMovesData = useMemo(() => {
         if (currentMoveIndex === 0) return { hiddenMoves: [], specialLabels: [] };
 
         const moveHistory = new Map<string, { number: number, color: StoneColor }[]>(); // "x,y" -> list of moves
@@ -518,7 +600,7 @@ function App() {
 
         // 2. Identify Collisions and Assign Labels
         const labels: { x: number, y: number, label: string }[] = [];
-        const footer: { left: { text: string, color: StoneColor }, right: { text: string, color: StoneColor } }[] = [];
+        const footer: { left: { text: string, color: StoneColor }[], right: { text: string, color: StoneColor } }[] = [];
 
         let labelIndex = 0;
         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -548,7 +630,7 @@ function App() {
                 // Manual Label takes precedence. List ALL moves at this spot.
                 moves.forEach(m => {
                     footer.push({
-                        left: { text: getMoveText(m.number), color: m.color },
+                        left: [{ text: getMoveText(m.number), color: m.color }],
                         right: { text: manualLabel, color: m.color }
                     });
                 });
@@ -571,11 +653,14 @@ function App() {
                     labelIndex++;
                     labels.push({ x: x + 1, y: y + 1, label });
 
-                    // Legend: Current Move -> Label
+                    // Legend: List ALL moves at this label.
                     // Right color should match the hidden Setup stone to indicate what was there.
+                    // COMPACT MODE: Group 10, 14, 15 into one entry.
                     const hiddenSetup = setupMoves[0];
+                    const leftStones = numberedMoves.map(m => ({ text: getMoveText(m.number), color: m.color }));
+
                     footer.push({
-                        left: { text: getMoveText(topMove.number), color: topMove.color },
+                        left: leftStones, // Now an array!
                         right: { text: label, color: hiddenSetup.color }
                     });
                 } else {
@@ -584,7 +669,7 @@ function App() {
                     const prevMove = numberedMoves[numberedMoves.length - 2];
                     if (prevMove) {
                         footer.push({
-                            left: { text: getMoveText(topMove.number), color: topMove.color },
+                            left: [{ text: getMoveText(topMove.number), color: topMove.color }],
                             right: { text: getMoveText(prevMove.number), color: prevMove.color }
                         });
                     }
@@ -606,11 +691,44 @@ function App() {
             }
         });
 
-        // Sort footer by move number
-        footer.sort((a, b) => parseInt(a.left.text) - parseInt(b.left.text));
+        // Sort footer by move number (use first move in group)
+        footer.sort((a, b) => parseInt(a.left[0].text) - parseInt(b.left[0].text));
 
         return { hiddenMoves: footer, specialLabels: labels };
     }, [history, currentMoveIndex]);
+
+    const { hiddenMoves, specialLabels } = hiddenMovesData;
+
+    // Display Board Logic: Swaps current stone for setup stone during export collision
+    const displayBoard = useMemo(() => {
+        if (!isFigureMode) return board;
+
+        // Strategy: "First Priority / Accumulation"
+        // Show stones that occupied the spot FIRST.
+        // 1. Setup stones (History 0).
+        // 2. Moves 1..Current (First priority).
+        // 3. Ignore captures.
+
+        // Start with clean slate for Figure View
+        const exportBoard: BoardState = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
+
+        for (let i = 0; i <= currentMoveIndex; i++) {
+            const stepBoard = history[i].board;
+            if (!stepBoard) continue;
+
+            for (let y = 0; y < boardSize; y++) {
+                for (let x = 0; x < boardSize; x++) {
+                    const stone = stepBoard[y][x];
+                    // Fill empty spots only (First Come Priority)
+                    if (stone && !exportBoard[y][x]) {
+                        exportBoard[y][x] = { ...stone };
+                    }
+                }
+            }
+        }
+
+        return exportBoard;
+    }, [isFigureMode, history, boardSize, currentMoveIndex]);
 
     const getRestoredStones = useCallback(() => {
         const restored: { x: number, y: number, color: StoneColor, text: string }[] = [];
@@ -700,7 +818,7 @@ function App() {
 
         const x = (minX - 1) * CELL_SIZE + (MARGIN - PADDING);
         const y = (minY - 1) * CELL_SIZE + (MARGIN - PADDING);
-        const width = (maxX - minX) * CELL_SIZE + PADDING * 2;
+        let width = (maxX - minX) * CELL_SIZE + PADDING * 2;
         let height = (maxY - minY) * CELL_SIZE + PADDING * 2;
 
         const clone = svgRef.current.cloneNode(true) as SVGSVGElement;
@@ -758,21 +876,103 @@ function App() {
             if (hiddenMoves.length > 0) {
                 // Relocate Footer to be visible in the cropped view
                 const startX = MARGIN + (minX - 1) * CELL_SIZE - CELL_SIZE / 2 + (showCoordinates ? -25 : 0) + 10;
-                // Add more vertical spacing (50px instead of 20px) to clearly separate from board
-                const startY = MARGIN + (maxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 50;
+                // Add more vertical spacing: 40px (Standardized with GoBoard)
+                const startY = MARGIN + (maxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 40;
 
                 footerGroup.setAttribute('transform', `translate(${startX}, ${startY})`);
 
-                // Calculate required extra height
-                const rows = Math.ceil(hiddenMoves.length / 4);
-                const footerContentHeight = rows * 40;
-                const footerMargin = 50 + 20; // Top + Bottom padding for footer
+                // Dynamic Flow Layout Logic for Export
+                // We need to calculate widths exactly as GoBoard.tsx does to match layout.
+                const boardDisplayWidth = (maxX - minX + 1) * CELL_SIZE;
 
-                // Increase height of the viewBox to fitting the footer
-                height += footerContentHeight + footerMargin;
+                // We need to know the width of each item.
+                // hiddenMovesData has the structure: { left: [], right: ... }
+                // We iterate `hiddenMoves` (which is passed to this function or available as prop? App has `footer` state?)
+                // Wait, `performExport` uses `hiddenMoves` variable which is `footerData` from `hiddenMovesData`.
+
+                let currentX = 0;
+                let currentY = 0;
+                let maxRowY = 0;
+
+                // Re-flow Footer Items
+                const children = Array.from(footerGroup.children);
+                let itemIndex = 0;
+
+                children.forEach((child) => {
+                    // Skip background rect
+                    if (child.tagName.toLowerCase() === 'rect') return;
+
+                    // Get corresponding data item to calculate width
+                    // hiddenMoves is the source data.
+                    const moveData = hiddenMoves[itemIndex];
+                    if (!moveData) return; // Should not happen
+
+                    const leftW = 20 + (moveData.left.length * 35);
+                    const rightW = 80;
+                    const itemWidth = leftW + rightW;
+
+                    if (itemIndex === 0) {
+                        currentX = 0;
+                        currentY = 0;
+                    } else {
+                        if (currentX + itemWidth + 20 + itemWidth > boardDisplayWidth) {
+                            // Logic check: GoBoard uses `prev.x + prev.width + 20 + itemWidth > boardDisplayWidth`
+                            // Here `currentX` acts as `prev.x + prev.width`.
+                            // So if `currentX + 20 + itemWidth > boardDisplayWidth` -> Wrap.
+                            // But `currentX` is the END of previous item?
+                            // Let's align variables.
+
+                            // Let's accumulate:
+                            // If `currentX + 20 + itemWidth` > `boardDisplayWidth` -> Wrap.
+
+                            if (currentX + 20 + itemWidth > boardDisplayWidth) {
+                                currentX = 0;
+                                currentY += 40;
+                            } else {
+                                currentX += 20;
+                            }
+                        } else {
+                            // If it fits?
+                            // GoBoard logic:
+                            // if (prev.x + prev.width + 20 + itemWidth > boardDisplayWidth)
+
+                            // Converting to incremental:
+                            if (currentX + 20 + itemWidth > boardDisplayWidth) {
+                                currentX = 0;
+                                currentY += 40;
+                            } else {
+                                currentX += 20;
+                            }
+                        }
+                    }
+
+                    // Set transform
+                    child.setAttribute('transform', `translate(${currentX}, ${currentY})`);
+
+                    // Advance X for next item
+                    currentX += itemWidth;
+
+                    // Track Max Y for height calc
+                    maxRowY = Math.max(maxRowY, currentY);
+
+                    itemIndex++;
+                });
+
+                // Calculate required extra height based on LAST item's Y position
+                const footerContentHeight = maxRowY + 40; // +40 for the last row height
+
+                // Robust Height Calculation
+                const currentViewboxBottom = y + height;
+                const requiredBottom = startY + footerContentHeight + 30;
+
+                if (requiredBottom > currentViewboxBottom) {
+                    height = requiredBottom - y;
+                }
             }
         }
 
+
+        // No width extension needed as we wrap content.
         clone.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
         clone.setAttribute('width', `${width}`);
         clone.setAttribute('height', `${height}`);
@@ -780,38 +980,95 @@ function App() {
         await exportToPng(clone, 3, isMonochrome ? '#FFFFFF' : '#DCB35C');
     }, [hiddenMoves, showCoordinates, showCapturedInExport, isMonochrome]);
 
-    const handleExport = useCallback(async () => {
-        // Auto-crop to all stones
-        const { hasStones, minX, maxX, minY, maxY } = getBounds();
+    const loadSGF = (content: string) => {
+        const { board: startBoard, moves, size: newSize } = parseSGF(content);
 
-        const restored = showCapturedInExport ? getRestoredStones() : [];
+        // Initialize History with Start Board
+        const newHistory: HistoryState[] = [{
+            board: JSON.parse(JSON.stringify(startBoard)),
+            nextNumber: 1,
+            activeColor: 'BLACK',
+            boardSize: newSize
+        }];
 
-        let finalMinX = minX;
-        let finalMaxX = maxX;
-        let finalMinY = minY;
-        let finalMaxY = maxY;
-        let finalHasStones = hasStones;
+        // Simulate Moves to build History
+        let currentBoard = JSON.parse(JSON.stringify(startBoard));
+        let currentNumber = 1;
+        let currentColor: StoneColor = 'BLACK';
 
-        if (restored.length > 0) {
-            finalHasStones = true;
-            restored.forEach(s => {
-                if (s.x < finalMinX) finalMinX = s.x;
-                if (s.x > finalMaxX) finalMaxX = s.x;
-                if (s.y < finalMinY) finalMinY = s.y;
-                if (s.y > finalMaxY) finalMaxY = s.y;
+        for (const move of moves) {
+            // Clone board for next state
+            const nextBoard = JSON.parse(JSON.stringify(currentBoard));
+
+            // Place Stone (1-based from parser)
+            if (move.x >= 1 && move.x <= newSize && move.y >= 1 && move.y <= newSize) {
+                nextBoard[move.y - 1][move.x - 1] = {
+                    color: move.color,
+                    number: currentNumber
+                };
+
+                // Check Captures
+                const captures = checkCaptures(nextBoard, move.x - 1, move.y - 1, move.color);
+                captures.forEach(c => {
+                    nextBoard[c.y][c.x] = null;
+                });
+            }
+
+            // Prepare state for history
+            currentNumber++;
+            currentColor = move.color === 'BLACK' ? 'WHITE' : 'BLACK'; // Toggle for next
+            currentBoard = nextBoard;
+
+            newHistory.push({
+                board: nextBoard,
+                nextNumber: currentNumber,
+                activeColor: currentColor,
+                boardSize: newSize
             });
         }
 
-        // Handle empty board default
-        if (finalMinX === Infinity) {
-            finalMinX = 1; finalMaxX = boardSize; finalMinY = 1; finalMaxY = boardSize;
-        }
+        // Update State
+        setHistory(newHistory);
+        setCurrentMoveIndex(0); // Start at Initial Setup
+    };
 
-        if (finalHasStones) {
-            await performExport({ minX: finalMinX, maxX: finalMaxX, minY: finalMinY, maxY: finalMaxY }, restored);
-        } else {
-            // Empty board? Full export
-            if (svgRef.current) await exportToPng(svgRef.current, 3, isMonochrome ? '#FFFFFF' : '#DCB35C');
+
+
+    const handleExport = useCallback(async () => {
+        const boardEl = svgRef.current;
+        if (!boardEl) return;
+
+        // Auto-Enable Figure Mode (Show Label A) for Export
+        setIsFigureMode(true);
+        // Wait for React Render
+        await new Promise(r => setTimeout(r, 50));
+
+        try {
+            // Auto-crop to all stones
+            const { hasStones, minX, maxX, minY, maxY } = getBounds();
+            const restored = showCapturedInExport ? getRestoredStones() : [];
+            let finalMinX = minX, finalMaxX = maxX, finalMinY = minY, finalMaxY = maxY, finalHasStones = hasStones;
+
+            if (restored.length > 0) {
+                finalHasStones = true;
+                restored.forEach(s => {
+                    if (s.x < finalMinX) finalMinX = s.x;
+                    if (s.x > finalMaxX) finalMaxX = s.x;
+                    if (s.y < finalMinY) finalMinY = s.y;
+                    if (s.y > finalMaxY) finalMaxY = s.y;
+                });
+            }
+
+            if (finalMinX === Infinity) { finalMinX = 1; finalMaxX = boardSize; finalMinY = 1; finalMaxY = boardSize; }
+
+            if (finalHasStones) {
+                await performExport({ minX: finalMinX, maxX: finalMaxX, minY: finalMinY, maxY: finalMaxY }, restored);
+            } else {
+                if (svgRef.current) await exportToPng(svgRef.current, 3, isMonochrome ? '#FFFFFF' : '#DCB35C');
+            }
+        } finally {
+            // Revert to Operation Mode (Number 11)
+            setIsFigureMode(false);
         }
     }, [getBounds, isMonochrome, getRestoredStones, boardSize, showCapturedInExport, performExport]);
 
@@ -823,10 +1080,18 @@ function App() {
         const y1 = Math.min(selectionStart.y, selectionEnd.y);
         const y2 = Math.max(selectionStart.y, selectionEnd.y);
 
-        const restored = showCapturedInExport ? getRestoredStones() : [];
+        // Auto-Enable Figure Mode (Show Label A) for Export
+        setIsFigureMode(true);
+        // Wait for React Render
+        await new Promise(r => setTimeout(r, 50));
 
-        // Manual Selection: Use exact bounds (Revert v25 behavior)
-        await performExport({ minX: x1, maxX: x2, minY: y1, maxY: y2 }, restored);
+        try {
+            const restored = showCapturedInExport ? getRestoredStones() : [];
+            await performExport({ minX: x1, maxX: x2, minY: y1, maxY: y2 }, restored);
+        } finally {
+            // Revert
+            setIsFigureMode(false);
+        }
 
         // Reset Selection
         setIsSelecting(false);
@@ -835,6 +1100,8 @@ function App() {
         setDragMode('SELECTING');
         setMoveSource(null);
     }, [selectionStart, selectionEnd, getBounds, getRestoredStones, showCapturedInExport, performExport]);
+
+
 
     // SGF Logic
     const getSGFString = useCallback(() => {
@@ -1061,7 +1328,8 @@ function App() {
             if (window.showSaveFilePicker) {
                 // @ts-ignore
                 const handle = await window.showSaveFilePicker({
-                    suggestedName: `gorw_export_${Date.now()}.sgf`,
+                    suggestedName: '',
+                    startIn: saveFileHandle,
                     types: [{
                         description: 'Smart Game Format',
                         accept: { 'application/x-go-sgf': ['.sgf'] },
@@ -1083,7 +1351,7 @@ function App() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `gorw_export_${Date.now()}.sgf`;
+        a.download = `game.sgf`;
         a.click();
         URL.revokeObjectURL(url);
     };
@@ -1104,88 +1372,10 @@ function App() {
                 setSaveFileHandle(null);
                 handleSaveSGF();
             }
-        } else {
-            handleSaveSGF();
         }
     };
 
-    const loadSGF = (content: string) => {
-        const { board: startBoard, moves, size: newSize } = parseSGF(content);
 
-        // Initialize History with Start Board
-        const newHistory: HistoryState[] = [{
-            board: JSON.parse(JSON.stringify(startBoard)),
-            nextNumber: 1,
-            activeColor: 'BLACK',
-            boardSize: newSize
-        }];
-
-        // Simulate Moves to build History
-        let currentBoard = JSON.parse(JSON.stringify(startBoard));
-        let currentNumber = 1;
-        let currentColor: StoneColor = 'BLACK';
-
-        for (const move of moves) {
-            // Clone board for next state
-            const nextBoard = JSON.parse(JSON.stringify(currentBoard));
-
-            // Place Stone (1-based from parser)
-            if (move.x >= 1 && move.x <= newSize && move.y >= 1 && move.y <= newSize) {
-                nextBoard[move.y - 1][move.x - 1] = {
-                    color: move.color,
-                    number: currentNumber
-                };
-
-                // Check Captures
-                const captures = checkCaptures(nextBoard, move.x - 1, move.y - 1, move.color);
-                captures.forEach(c => {
-                    nextBoard[c.y][c.x] = null;
-                });
-            }
-
-            // Prepare state for history
-            currentNumber++;
-            currentColor = move.color === 'BLACK' ? 'WHITE' : 'BLACK'; // Toggle for next
-            currentBoard = nextBoard;
-
-            newHistory.push({
-                board: nextBoard,
-                nextNumber: currentNumber,
-                activeColor: currentColor,
-                boardSize: newSize
-            });
-        }
-
-        // Update State
-        setHistory(newHistory);
-        setCurrentMoveIndex(0); // Start at Initial Setup
-    };
-
-
-
-    // Paste Listener
-    useEffect(() => {
-        const onPaste = (e: ClipboardEvent) => {
-            const text = e.clipboardData?.getData('text');
-            // Simple check if it looks like SGF
-            if (text && (text.includes('(;') || text.includes('GM['))) {
-                e.preventDefault();
-                loadSGF(text);
-            }
-        };
-        window.addEventListener('paste', onPaste);
-        return () => window.removeEventListener('paste', onPaste);
-    }, [nextNumber, activeColor]); // commitState uses stack, but nextNumber/activeColor need to be preserved?
-    // Actually commitState uses 'history' from closure.
-    // We should depend on history to handle next state correctly, OR fix commitState.
-    // Since we use functional updates in simple hooks, but commitState depends on snapshot.
-
-    // Actually, wait. loadSGF calls commitState.
-    // commitState uses `history` variable.
-    // effect has no dependency on `history`?
-    // It will trap stale `history`.
-    // Fix: use a Ref for history access or depend on history.
-    // If we depend on history, we rebind paste listener every move. That's fine.
 
 
 
@@ -1399,6 +1589,16 @@ function App() {
                         👻
                     </button>
 
+                    <button
+                        onClick={() => setShowNumbers(!showNumbers)}
+                        title={`Toggle Numbers: ${showNumbers ? 'ON' : 'OFF'}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center font-bold transition-colors ${showNumbers ? 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                    >
+                        ⑧
+                    </button>
+
+
+
 
 
                     <div className="w-px h-6 bg-gray-300 mx-1"></div>
@@ -1413,6 +1613,12 @@ function App() {
                     <button onClick={handleRedo} disabled={currentMoveIndex === history.length - 1} title="Redo"
                         className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 font-bold flex items-center justify-center h-8">
                         &gt;
+                    </button>
+
+                    {/* Pass Button */}
+                    <button onClick={handlePass} disabled={mode !== 'NUMBERED'} title="Pass"
+                        className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 font-bold flex items-center justify-center h-8 ml-1 text-lg">
+                        ✋
                     </button>
 
                     <div className="w-px h-6 bg-gray-300 mx-1"></div>
@@ -1520,10 +1726,11 @@ function App() {
             >
                 <GoBoard
                     ref={svgRef}
-                    boardState={board}
+                    boardState={displayBoard}
                     boardSize={boardSize}
                     viewRange={effectiveViewRange}
                     showCoordinates={showCoordinates}
+                    showNumbers={showNumbers}
                     isMonochrome={isMonochrome}
                     onCellClick={handleInteraction}
                     onCellRightClick={handleRightClick}
@@ -1535,7 +1742,8 @@ function App() {
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}
-                    hiddenMoves={hiddenMoves}
+                    hiddenMoves={isFigureMode ? hiddenMoves : []}
+                    prioritizeLabel={isFigureMode}
                     specialLabels={specialLabels}
                     nextNumber={nextNumber}
                     activeColor={activeColor}
@@ -1641,15 +1849,11 @@ function App() {
                             <text x="12" y="17" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold" fontFamily="sans-serif">1</text>
                         </svg>
                     </button>
-                </div>
-
-                {/* Annotation Tools */}
-                <div className="flex items-center justify-center space-x-2 border-b pb-2">
                     {/* Label Mode */}
                     <button
                         title="Label Mode (A, B, C...)"
                         onClick={() => setToolMode('LABEL')}
-                        className={`w-8 h-8 rounded font-bold border flex items-center justify-center transition-all ${toolMode === 'LABEL' ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-white border-gray-300 hover:bg-gray-100'}`}
+                        className={`ml-4 w-10 h-10 rounded font-bold border flex items-center justify-center transition-all ${toolMode === 'LABEL' ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-white border-gray-300 hover:bg-gray-100'}`}
                     >
                         A
                     </button>
@@ -1663,7 +1867,7 @@ function App() {
                             setSelectedSymbol(val);
                             setToolMode('SYMBOL');
                         }}
-                        className={`h-8 rounded border px-1 text-sm bg-white cursor-pointer transition-all ${toolMode === 'SYMBOL' ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-300'}`}
+                        className={`ml-2 h-10 rounded border px-1 text-sm bg-white cursor-pointer transition-all ${toolMode === 'SYMBOL' ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-300'}`}
                     >
                         <option value="" disabled hidden>記号</option>
                         <option value="TRI">△</option>
@@ -1672,65 +1876,68 @@ function App() {
                         <option value="X">✕</option>
                     </select>
                 </div>
+            </div>
 
-                {/* Tools: Next, Coords, Size */}
-                <div className="flex flex-col gap-2 bg-gray-50 p-2 rounded">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="text-gray-600">Next:</span>
-                            <div
-                                onClick={handleIndicatorDoubleClick}
-                                className={`w - 6 h - 6 rounded - full border border - gray - 300 flex items - center justify - center text - xs font - bold cursor - pointer hover: ring - 2 hover: ring - blue - 300 select - none
+
+
+            {/* Tools: Next, Coords, Size */}
+            <div className="flex flex-col gap-2 bg-gray-50 p-2 rounded">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="text-gray-600">Next:</span>
+                        <div
+                            onClick={handleIndicatorDoubleClick}
+                            className={`w - 6 h - 6 rounded - full border border - gray - 300 flex items - center justify - center text - xs font - bold cursor - pointer hover: ring - 2 hover: ring - blue - 300 select - none
                     ${activeColor === 'BLACK' ? 'bg-black text-white' : 'bg-white text-black'} `}>
-                                {mode === 'NUMBERED' ? nextNumber : ''}
-                            </div>
+                            {mode === 'NUMBERED' ? nextNumber : ''}
                         </div>
+                    </div>
 
+                    <button
+                        onClick={() => setShowCoordinates(!showCoordinates)}
+                        className={`text - xs px - 2 py - 1 rounded border ${showCoordinates ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'} `}
+                    >
+                        Coords: {showCoordinates ? 'ON' : 'OFF'}
+                    </button>
+                </div>
+
+                {/* Size Switcher */}
+                <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
+                    <span className="text-xs text-gray-500">Size:</span>
+                    {[19, 13, 9].map(s => (
                         <button
-                            onClick={() => setShowCoordinates(!showCoordinates)}
-                            className={`text - xs px - 2 py - 1 rounded border ${showCoordinates ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'} `}
+                            key={s}
+                            onClick={() => setBoardSize(s)}
+                            className={`text - xs px - 2 py - 0.5 rounded border ${boardSize === s ? 'bg-gray-700 text-white' : 'text-gray-600 border-gray-300 hover:bg-gray-200'} `}
                         >
-                            Coords: {showCoordinates ? 'ON' : 'OFF'}
+                            {s}路
                         </button>
-                    </div>
+                    ))}
+                </div>
 
-                    {/* Size Switcher */}
+                {mode === 'NUMBERED' && (
                     <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
-                        <span className="text-xs text-gray-500">Size:</span>
-                        {[19, 13, 9].map(s => (
-                            <button
-                                key={s}
-                                onClick={() => setBoardSize(s)}
-                                className={`text - xs px - 2 py - 0.5 rounded border ${boardSize === s ? 'bg-gray-700 text-white' : 'text-gray-600 border-gray-300 hover:bg-gray-200'} `}
-                            >
-                                {s}路
-                            </button>
-                        ))}
+                        <label className="text-xs">Start #:</label>
+                        <input
+                            type="number"
+                            className="w-12 border rounded px-1 text-center"
+                            value={nextNumber}
+                            onChange={(e) => setNextNumberDirectly(Math.max(1, parseInt(e.target.value) || 1))}
+                        />
                     </div>
+                )}
+            </div>
 
-                    {mode === 'NUMBERED' && (
-                        <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
-                            <label className="text-xs">Start #:</label>
-                            <input
-                                type="number"
-                                className="w-12 border rounded px-1 text-center"
-                                value={nextNumber}
-                                onChange={(e) => setNextNumberDirectly(Math.max(1, parseInt(e.target.value) || 1))}
-                            />
-                        </div>
-                    )}
-                </div>
-
-                {/* SGF & Export */}
-                {/* Actions (Moved to Header) */}
-                {/* Actions (Moved to Header) */}
-                <div className="text-xs text-center text-gray-400 mt-2 space-y-1 pt-4 border-t border-gray-100">
-                    <div>L: Place / R: Delete / Wheel: Nav</div>
-                    <div>DblClick: Swap Color / Switch Tool</div>
-                    <div>**Ctrl+V: Paste SGF**</div>
-                </div>
+            {/* SGF & Export */}
+            {/* Actions (Moved to Header) */}
+            {/* Actions (Moved to Header) */}
+            <div className="text-xs text-center text-gray-400 mt-2 space-y-1 pt-4 border-t border-gray-100">
+                <div>L: Place / R: Delete / Wheel: Nav</div>
+                <div>DblClick: Swap Color / Switch Tool</div>
+                <div>**Ctrl+V: Paste SGF**</div>
             </div>
         </div>
+
     );
 }
 

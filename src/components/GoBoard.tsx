@@ -35,7 +35,9 @@ export interface GoBoardProps {
 
     viewRange?: ViewRange; // Optional now?
     showCoordinates?: boolean;
+    showNumbers?: boolean;
     isMonochrome?: boolean;
+    prioritizeLabel?: boolean; // Toggle Number vs Label priority
 
     // Interactions
     onCellClick: (x: number, y: number) => void;
@@ -52,7 +54,7 @@ export interface GoBoardProps {
     onDragMove: (x: number, y: number) => void;
     onDragEnd?: () => void;
     hiddenMoves?: {
-        left: { text: string, color: StoneColor };
+        left: { text: string, color: StoneColor }[];
         right: { text: string, color?: StoneColor, isLabel?: boolean };
     }[];
     specialLabels?: { x: number, y: number, label: string }[];
@@ -66,7 +68,9 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     boardSize,
     viewRange,
     showCoordinates = false,
+    showNumbers = true,
     isMonochrome = false,
+    prioritizeLabel = false,
     onCellClick,
     onCellRightClick,
     onBoardWheel,
@@ -287,9 +291,19 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 const isBlack = stone.color === 'BLACK';
                 const label = specialLabels.find(l => l.x === x && l.y === y)?.label;
 
-                // Priority: Number > Label (Constant Setting per user request)
-                // "Operation and Image Constant" + "Operation not A".
-                const displayText = stone.number?.toString() || label;
+                // Priority Logic:
+                // If prioritizeLabel is TRUE (Export Mode), prefer Label (A) to match Legend.
+                // If prioritizeLabel is FALSE (Operation Mode), prefer Number (11).
+                // Updated Logic: Check showNumbers.
+                // If showNumbers is FALSE, we hide numbers, but we might still show Labels?
+                // Yes, usually "No Numbers" means "Just stones". But if a Label was explicitly set, maybe show it?
+                // Let's assume toggle only affects Move Numbers. Labels are markers.
+
+                const numText = showNumbers ? stone.number?.toString() : undefined;
+
+                const displayText = prioritizeLabel
+                    ? (label || numText)
+                    : (numText || label);
 
                 cells.push(
                     <g key={`s-group-${x}-${y}`} className="pointer-events-none">
@@ -444,57 +458,95 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
 
             {/* Footer Text for Hidden Moves */}
             {hiddenMoves.length > 0 && (() => {
-                const { minX, maxX: _, minY: __, maxY } = viewRange || { minX: 1, maxX: boardSize, minY: 1, maxY: boardSize };
+                const { minX, maxX, minY: __, maxY } = viewRange || { minX: 1, maxX: boardSize, minY: 1, maxY: boardSize };
                 const validMinX = Math.max(1, minX);
+                const validMaxX = Math.min(boardSize, maxX);
                 const validMaxY = Math.min(boardSize, maxY);
 
                 // Start Position: Below board (Footer)
-                // Increased spacing to 80px to strictly visually separate from board grid.
+                // Reduced spacing to 40px (approx 1 cell) to save space.
                 const startX = MARGIN + (validMinX - 1) * CELL_SIZE - CELL_SIZE / 2 + (showCoordinates ? -25 : 0) + 10;
-                const startY = MARGIN + (validMaxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 80;
+                const startY = MARGIN + (validMaxY - 1) * CELL_SIZE + CELL_SIZE / 2 + (showCoordinates ? 25 : 0) + 40;
 
-                const ITEM_SPACING = 140; // Increased spacing for larger board-sized stones and text
-                const RADIUS = STONE_RADIUS; // Match board stone size exactly
-                const FONT = FONT_SIZE;      // Match board font size exactly
+                const RADIUS = STONE_RADIUS;
+                const FONT = FONT_SIZE;
 
-                // Determine background color to mask any underlying grid lines (if viewing partial board)
+                // Dynamic Flow Layout Calculation
+                const boardDisplayWidth = (validMaxX - validMinX + 1) * CELL_SIZE;
+
                 const footerBg = isMonochrome ? 'white' : '#DCB35C';
 
+                // Pre-calculate positions using Flow Layout
+                const itemsWithPos = hiddenMoves.reduce((acc, ref, i) => {
+                    const leftW = 20 + (ref.left.length * 35);
+                    const rightW = 80;
+                    const itemWidth = leftW + rightW;
+
+                    let nextX = 0;
+                    let nextY = 0;
+
+                    if (i === 0) {
+                        nextX = 0;
+                        nextY = 0;
+                    } else {
+                        const prev = acc[i - 1];
+                        if (prev.x + prev.width + 20 + itemWidth > boardDisplayWidth) {
+                            nextX = 0;
+                            nextY = prev.y + 40;
+                        } else {
+                            // Gap of 20px
+                            nextX = prev.x + prev.width + 20;
+                            nextY = prev.y;
+                        }
+                    }
+
+                    acc.push({ ...ref, x: nextX, y: nextY, width: itemWidth });
+                    return acc;
+                }, [] as any[]);
+
                 return (
-                    <g id="footer-group" transform={`translate(${startX}, ${startY})`}>
+                    <g id="footer-group" transform={`translate(${startX}, ${startY})`} data-layout="flow">
                         {/* Background Mask: Hides grid lines if footer overlaps board area (in cropped view) */}
                         {/* We cover the area starting from the "spacing" gap down to the bottom */}
                         <rect
                             x={-2000}
-                            y={-80} // Start from the top of the spacing gap
+                            y={-40} // Start from the top of the spacing gap
                             width={4000}
                             height={1000} // Sufficiently large
                             fill={footerBg}
                             stroke="none"
                         />
 
-                        {hiddenMoves.map((ref, i) => {
-                            const x = (i % 4) * ITEM_SPACING;
-                            const y = Math.floor(i / 4) * 40;
+                        {itemsWithPos.map((item, i) => {
+                            const { x, y } = item;
+                            const rColor = item.right.color;
 
-                            const lColor = ref.left.color;
-                            const rColor = ref.right.color;
+                            const leftGroup = item.left.map((stone: any, idx: number) => {
+                                const stoneX = 20 + idx * 35;
+                                return (
+                                    <g key={`l-${idx}`}>
+                                        <circle cx={stoneX} cy={0} r={RADIUS} fill={stone.color === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
+                                        <text x={stoneX} y={0} dy=".35em" textAnchor="middle" fill={stone.color === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{stone.text}</text>
+                                    </g>
+                                );
+                            });
+
+                            const leftWidthLength = item.left.length;
+                            const rightStartX = 20 + (leftWidthLength * 35);
 
                             return (
                                 <g key={`hm-${i}`} transform={`translate(${x}, ${y})`}>
-                                    {/* Left Stone */}
-                                    <circle cx={20} cy={0} r={RADIUS} fill={lColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
-                                    <text x={20} y={0} dy=".35em" textAnchor="middle" fill={lColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{ref.left.text}</text>
+                                    {leftGroup}
 
                                     {/* Bracket Open */}
-                                    <text x={50} y={8} fontSize="20" fill="black" fontFamily="sans-serif">[</text>
+                                    <text x={rightStartX} y={8} fontSize="20" fill="black" fontFamily="sans-serif">[</text>
 
                                     {/* Right Stone (Label) */}
-                                    <circle cx={80} cy={0} r={RADIUS} fill={rColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
-                                    <text x={80} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{ref.right.text}</text>
+                                    <circle cx={rightStartX + 30} cy={0} r={RADIUS} fill={rColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
+                                    <text x={rightStartX + 30} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{item.right.text}</text>
 
                                     {/* Bracket Close */}
-                                    <text x={110} y={8} fontSize="20" fill="black" fontFamily="sans-serif">]</text>
+                                    <text x={rightStartX + 60} y={8} fontSize="20" fill="black" fontFamily="sans-serif">]</text>
                                 </g>
                             );
                         })}

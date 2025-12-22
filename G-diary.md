@@ -24,4 +24,32 @@
 - **Double-Click Color Swap**: In Numbered Mode, double-clicking the last placed stone toggles its color (Black/White).
 - **UI Restoration**: Restored missing Tool Mode buttons (Stone/Label/Symbol).
 - **UI Restoration**: Restored missing Tool Mode buttons (Stone/Label/Symbol).
-- **UI Restoration**: Restored missing Tool Mode buttons (Stone/Label/Symbol).
+- **2024-12-19**: Refined 'Hidden Move Legend' visibility. 
+    - Legend is now **hidden** on the operation board (live view).
+    - Legend is **automatically shown** only during image export (along with 'Label Mode' A/B display).
+    - Fixed `handleExport` and `handleExportSelection` logic to handle this temporary state switching reliably.
+    - Resolved build errors in `App.tsx`.
+- **2024-12-20**:
+    - **Pass Feature**: Added a 'Pass' button (✋) next to navigation controls. Records a pass move (increments number, toggles color, no board change).
+    - **Fixes**: Corrected Setup Mode double-click and drag behavior to propagate changes across history, preventing phantom 'A' labels.
+    - **Export**: Exported images now accumulate all stones placed throughout history. Setup stones and earlier moves are prioritized. Stones are never removed (captures are ignored in the figure view), ensuring the complete sequence is visible.
+    - **Export**: Fixed an issue where the legend would cut off the bottom row of the board image. Adjusted height calculation to ensure the legend expands the image size rather than consuming it.
+    - **Export**: Reduced vertical spacing around the legend (Gap: 40px, Padding: 30px) to make the layout more compact.
+    - **SGF Save**: Changed default filename to **Empty** (Blank) to allow users to type their desired name immediately without deleting text.
+    - **Legend Fix**: Updated auto-detection logic to display **ALL** moves associated with a label in the legend (e.g., if 10 and 14 are at 'A', the legend will show `10 [ A ]` and `14 [ A ]`).
+    - **Export Layout**: Implemented **dynamic line wrapping**.
+        - Instead of extending the width, the legend now automatically wraps to the next line if it exceeds the board's width.
+        - Added logic to explicitly **re-flow** legend items in the exported image, ensuring correct layout even when cropping from a large board.
+    - **Compact Legend Grouping**:
+        - Multiple moves at the same location (e.g., 10 and 14 at A) are now grouped into a single line: `10, 14, 15 [ A ]` (displayed as sequential stones), effectively compacting the vertical space.
+        - **Flow Layout**: Implemented dynamic position calculation for legend items to handle variable widths (e.g., grouped stones) correctly, preventing overlap that occurred with fixed grid layout.
+        - Corrected render order to ensure labels like "Triangle" are enclosed in brackets properly: `[ (Triangle) ]`.
+
+- **2024-12-21**:
+    - **石の操作ロジック変更**:
+        - **初期配置モード**: 
+            - **左クリック**: 黒石配置 / 既存石削除。
+            - **右クリック**: 白石配置 / 既存石削除。
+        - **手順入力モード**:
+            - **左クリック**: 数字石配置 / 最後の手番なら削除(Undo)。
+            - **右クリック**: 最後の手番削除(Undo)。入力は不可。
