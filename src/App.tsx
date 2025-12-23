@@ -7,6 +7,22 @@ import { parseSGF, generateSGF } from './utils/sgfUtils'
 // Chrome extension download API (type stub)
 declare const chrome: any;
 
+// Notify user where the downloads API saved the file (best-effort)
+const notifyDownloadLocation = (downloadId: number) => {
+    try {
+        if (chrome?.downloads?.search) {
+            chrome.downloads.search({ id: downloadId }, (results: any[]) => {
+                const path = results?.[0]?.filename;
+                if (path) {
+                    alert(`保存しました: ${path}`);
+                }
+            });
+        }
+    } catch (err) {
+        console.warn('Failed to fetch download location', err);
+    }
+};
+
 type PlacementMode = 'SIMPLE' | 'NUMBERED';
 
 export type ToolMode = 'STONE' | 'LABEL' | 'SYMBOL';
@@ -1362,10 +1378,13 @@ function App() {
                 await new Promise<void>((resolve, reject) => {
                     chrome.downloads.download(
                         { url, filename: 'game.sgf', saveAs: true, conflictAction: 'overwrite' },
-                        () => {
+                        (downloadId: number) => {
                             const lastErr = chrome.runtime?.lastError;
                             if (lastErr) reject(lastErr);
-                            else resolve();
+                            else {
+                                notifyDownloadLocation(downloadId);
+                                resolve();
+                            }
                         }
                     );
                 });
