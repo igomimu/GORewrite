@@ -64,6 +64,7 @@ function App() {
         }
     ]);
     const [currentMoveIndex, setCurrentMoveIndex] = useState(0);
+    const [redoStack, setRedoStack] = useState<HistoryState[][]>([]); // Stack of truncated history branches
 
     const currentState = history[currentMoveIndex];
     const board = currentState.board;
@@ -131,6 +132,7 @@ function App() {
         });
         setHistory(newHistory);
         setCurrentMoveIndex(newHistory.length - 1);
+        setRedoStack([]); // Clear Redo Stack on new divergence
     };
 
     // Change Board Size
@@ -421,8 +423,33 @@ function App() {
         setHistory(newHistory);
     };
 
-    const handleUndo = () => { if (currentMoveIndex > 0) setCurrentMoveIndex(i => i - 1); };
-    const handleRedo = () => { if (currentMoveIndex < history.length - 1) setCurrentMoveIndex(i => i + 1); };
+    const stepBack = () => { if (currentMoveIndex > 0) setCurrentMoveIndex(i => i - 1); };
+    const stepForward = () => { if (currentMoveIndex < history.length - 1) setCurrentMoveIndex(i => i + 1); };
+    const stepFirst = () => setCurrentMoveIndex(0);
+    const stepLast = () => setCurrentMoveIndex(history.length - 1);
+
+    const deleteLastMove = useCallback(() => {
+        if (currentMoveIndex > 0) {
+            const newHistory = history.slice(0, currentMoveIndex);
+            const truncated = history.slice(currentMoveIndex);
+
+            setHistory(newHistory);
+            setCurrentMoveIndex(newHistory.length - 1);
+            setRedoStack([...redoStack, truncated]);
+        }
+    }, [history, currentMoveIndex, redoStack]);
+
+    const restoreMove = useCallback(() => {
+        if (redoStack.length > 0) {
+            const toRestore = redoStack[redoStack.length - 1];
+            const newHistory = [...history, ...toRestore];
+
+            setHistory(newHistory);
+            setRedoStack(redoStack.slice(0, -1));
+            // Jump to end of restored segment (usually +1 move if we deleted 1, or more)
+            setCurrentMoveIndex(newHistory.length - 1);
+        }
+    }, [history, redoStack]);
 
     // Pass Move: Increments number, toggles color, board stays same
     const handlePass = () => {
@@ -434,7 +461,7 @@ function App() {
     };
     const handleWheel = (delta: number) => {
         if (Math.abs(delta) < 10) return;
-        if (delta > 0) handleRedo(); else handleUndo();
+        if (delta > 0) stepForward(); else stepBack();
     };
 
     const handleDragStart = (x: number, y: number) => {
@@ -479,9 +506,36 @@ function App() {
                     setHistory(newHistory);
                 } else {
                     // Numbered Mode
-                    const newBoard = board.map(row => [...row]);
-                    const stone = newBoard[moveSource.y - 1][moveSource.x - 1];
-                    if (stone) {
+                    const stone = board[moveSource.y - 1][moveSource.x - 1];
+
+                    // Case A: Correcting the LAST move (Undo + Replay at new spot)
+                    // We rewrite the CURRENT history step instead of appending.
+                    if (stone && stone.number === nextNumber - 1 && currentMoveIndex > 0) {
+                        const prevStep = history[currentMoveIndex - 1];
+                        const baseBoard = prevStep.board.map(r => r.map(c => c ? { ...c } : null));
+
+                        // Place at new Target
+                        baseBoard[targetY - 1][targetX - 1] = { ...stone };
+
+                        // Check Captures on the base board context
+                        const captured = checkCaptures(baseBoard, targetX - 1, targetY - 1, stone.color);
+                        captured.forEach(c => baseBoard[c.y][c.x] = null);
+
+                        // Replace current history entry
+                        const newHistory = history.slice(0, currentMoveIndex);
+                        newHistory.push({
+                            board: baseBoard,
+                            nextNumber: nextNumber,      // Same as before
+                            activeColor: activeColor,    // Same as before
+                            boardSize: boardSize,
+                            markers: history[currentMoveIndex].markers // Persist markers if any
+                        });
+                        setHistory(newHistory);
+                        // currentMoveIndex remains the same
+                    }
+                    // Case B: Moving an older stone (Append Correction Step)
+                    else if (stone) {
+                        const newBoard = board.map(row => [...row]);
                         newBoard[moveSource.y - 1][moveSource.x - 1] = null;
                         newBoard[targetY - 1][targetX - 1] = stone;
                         const captured = checkCaptures(newBoard, targetX - 1, targetY - 1, stone.color);
@@ -1319,6 +1373,8 @@ function App() {
             if (window.showOpenFilePicker) {
                 // @ts-ignore
                 const [handle] = await window.showOpenFilePicker({
+                    id: 'gorw_sgf',
+                    startIn: saveFileHandle || undefined,
                     types: [{
                         description: 'Smart Game Format',
                         accept: { 'application/x-go-sgf': ['.sgf'] },
@@ -1350,8 +1406,9 @@ function App() {
             if (window.showSaveFilePicker) {
                 // @ts-ignore
                 const handle = await window.showSaveFilePicker({
-                    suggestedName: 'game.sgf',
-                    startIn: saveFileHandle ?? 'downloads',
+                    id: 'gorw_sgf',
+                    suggestedName: '',
+                    startIn: saveFileHandle || undefined,
                     types: [{
                         description: 'Smart Game Format',
                         accept: { 'application/x-go-sgf': ['.sgf'] },
@@ -1377,7 +1434,7 @@ function App() {
             try {
                 await new Promise<void>((resolve, reject) => {
                     chrome.downloads.download(
-                        { url, filename: 'game.sgf', saveAs: true, conflictAction: 'overwrite' },
+                        { url, filename: '', saveAs: true, conflictAction: 'overwrite' },
                         (downloadId: number) => {
                             const lastErr = chrome.runtime?.lastError;
                             if (lastErr) reject(lastErr);
@@ -1504,34 +1561,28 @@ function App() {
             if (e.key === 'Delete') {
                 const deleted = handleDeleteParams();
                 if (!deleted) {
-                    // Destructive Delete: Remove current state and all future states
-                    if (currentMoveIndex > 0) {
-                        const newHistory = history.slice(0, currentMoveIndex);
-                        setHistory(newHistory);
-                        setCurrentMoveIndex(newHistory.length - 1);
-                    }
+                    deleteLastMove();
                 }
                 return;
             }
 
             if (e.key === 'Backspace') {
-                const deleted = handleDeleteParams();
-                if (!deleted) {
-                    handleUndo();
-                }
+                stepBack(); // Backspace as Navigation Back
                 return;
             }
 
-            // Alt+N: New / Clear
-            if (e.altKey && e.key.toLowerCase() === 'n') {
-                e.preventDefault();
-                clearBoard();
-                return;
-            }
+            if (e.key === 'ArrowLeft') { stepBack(); return; }
+            if (e.key === 'ArrowRight') { stepForward(); return; }
 
             // Shortcuts
             if (isCtrl) {
                 switch (e.key.toLowerCase()) {
+                    case 'z': // Ctrl+Z: Undo Action (Delete Last Move)
+                        deleteLastMove();
+                        break;
+                    case 'y': // Ctrl+Y: Redo Action (Restore Move)
+                        restoreMove();
+                        break;
                     // case 'n': // Ctrl+N suppressed above. Use Alt+N for New.
                     case 'o': // Open SGF
                         fileInputRef.current?.click();
@@ -1572,7 +1623,7 @@ function App() {
     }, [
         board, boardSize, history, currentMoveIndex,
         showHelp, isSelecting, selectionStart, selectionEnd, isCropped,
-        handleExportSelection, handleExport, handleSaveSGF, clearBoard, handleDeleteParams
+        handleExportSelection, handleExport, handleSaveSGF, clearBoard, handleDeleteParams, deleteLastMove
     ]);
 
     // Generate hidden move references and special labels
@@ -1587,7 +1638,7 @@ function App() {
         <div className="p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none">
             <div className="flex justify-between w-full items-center mb-2">
                 <div className="flex items-baseline gap-2">
-                    <span className="text-xs text-gray-400 font-normal pl-1">v33.0</span>
+                    <span className="text-xs text-gray-400 font-normal pl-1">v34.0</span>
                 </div>
                 <div className="flex gap-2 items-center">
                     {/* Hidden Input for Open SGF */}
@@ -1604,6 +1655,18 @@ function App() {
                         🗑️
                     </button>
 
+                    {/* Edit Group (Undo/Redo) - Moved to Left for separation */}
+                    <div className="flex gap-1 mx-1">
+                        <button onClick={deleteLastMove} disabled={currentMoveIndex === 0} title="Delete Last Move (Delete/Ctrl+Z)"
+                            className="w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 flex items-center justify-center font-bold text-lg">
+                            ⌫
+                        </button>
+                        <button onClick={restoreMove} disabled={redoStack.length === 0} title="Restore Deleted Move (Ctrl+Y)"
+                            className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50 flex items-center justify-center font-bold text-lg">
+                            ↻
+                        </button>
+                    </div>
+
                     {/* Overwrite Save */}
                     <button onClick={handleOverwriteSave} title="Overwrite Save (Save)" className="w-8 h-8 rounded-full bg-green-100 text-green-700 hover:bg-green-200 flex items-center justify-center font-bold transition-colors">
                         💾
@@ -1611,7 +1674,7 @@ function App() {
 
                     {/* Save As */}
                     <button onClick={handleSaveSGF} title="Save As... (Ctrl+S)" className="w-8 h-8 rounded-full bg-orange-50 text-orange-600 hover:bg-orange-100 flex items-center justify-center font-bold transition-colors">
-                        📤
+                        <img src="/icons/save_as_v2.png" alt="Save As" className="w-6 h-6 object-contain opacity-80" />
                     </button>
 
                     <button onClick={handleOpenSGF} title="Open SGF (Ctrl+O)" className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center font-bold transition-colors">
@@ -1647,17 +1710,6 @@ function App() {
 
                     <div className="w-px h-6 bg-gray-300 mx-1"></div>
 
-                    <button onClick={handleUndo} disabled={currentMoveIndex === 0} title="Undo"
-                        className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 font-bold flex items-center justify-center h-8">
-                        &lt;
-                    </button>
-
-                    <div className="text-xs text-gray-500 flex items-center min-w-[20px] justify-center">{mode === 'NUMBERED' ? `${currentMoveIndex}` : ''}</div>
-
-                    <button onClick={handleRedo} disabled={currentMoveIndex === history.length - 1} title="Redo"
-                        className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 font-bold flex items-center justify-center h-8">
-                        &gt;
-                    </button>
 
                     {/* Pass Button */}
                     <button onClick={handlePass} disabled={mode !== 'NUMBERED'} title="Pass"
@@ -1759,7 +1811,7 @@ function App() {
                         }`}
                     title="Toggle Monochrome (Printer Friendly)"
                 >
-                    {isMonochrome ? 'B/W Mode' : 'Color Mode'}
+                    {isMonochrome ? '白黒' : 'カラー'}
                 </button>
             </div>
 
@@ -1926,24 +1978,24 @@ function App() {
 
             {/* Tools: Next, Coords, Size */}
             <div className="flex flex-col gap-2 bg-gray-50 p-2 rounded">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="text-gray-600">Next:</span>
-                        <div
-                            onClick={handleIndicatorDoubleClick}
-                            className={`w - 6 h - 6 rounded - full border border - gray - 300 flex items - center justify - center text - xs font - bold cursor - pointer hover: ring - 2 hover: ring - blue - 300 select - none
-                    ${activeColor === 'BLACK' ? 'bg-black text-white' : 'bg-white text-black'} `}>
-                            {mode === 'NUMBERED' ? nextNumber : ''}
-                        </div>
-                    </div>
-
+                <div className="flex items-center gap-2">
                     <button
                         onClick={() => setShowCoordinates(!showCoordinates)}
-                        className={`text - xs px - 2 py - 1 rounded border ${showCoordinates ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'} `}
+                        className={`text-xs px-2 py-1 rounded border ${showCoordinates ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'} whitespace-nowrap`}
                     >
                         Coords: {showCoordinates ? 'ON' : 'OFF'}
                     </button>
+
+                    {/* Navigation Group (Moved from Top) */}
+                    <div className="flex bg-gray-200 rounded p-1 gap-1">
+                        <button onClick={stepFirst} disabled={currentMoveIndex === 0} title="First" className="px-2 font-bold hover:bg-white rounded disabled:opacity-30">|&lt;</button>
+                        <button onClick={stepBack} disabled={currentMoveIndex === 0} title="Back (Backspace/Left)" className="px-2 font-bold hover:bg-white rounded disabled:opacity-30">&lt;</button>
+                        <div className="text-xs flex items-center min-w-[30px] justify-center bg-white rounded px-2">{mode === 'NUMBERED' ? `${currentMoveIndex}` : '-'}</div>
+                        <button onClick={stepForward} disabled={currentMoveIndex === history.length - 1} title="Next (Right)" className="px-2 font-bold hover:bg-white rounded disabled:opacity-30">&gt;</button>
+                        <button onClick={stepLast} disabled={currentMoveIndex === history.length - 1} title="Last" className="px-2 font-bold hover:bg-white rounded disabled:opacity-30">&gt;|</button>
+                    </div>
                 </div>
+
 
                 {/* Size Switcher */}
                 <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
@@ -1981,6 +2033,7 @@ function App() {
                 <div>**Ctrl+V: Paste SGF**</div>
             </div>
         </div>
+    </div >
 
     );
 }
