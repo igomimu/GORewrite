@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { flushSync } from 'react-dom';
 import GoBoard, { ViewRange, BoardState, StoneColor, Marker } from './components/GoBoard'
 import GameInfoModal from './components/GameInfoModal'
 import PrintSettingsModal, { PrintSettings } from './components/PrintSettingsModal'
@@ -1107,24 +1106,41 @@ function App() {
     };
 
     const handlePrintRequest = (settings: PrintSettings) => {
-        // Force synchronous update to ensure DOM is ready for print
-        // while maintaining the user gesture context.
-        flushSync(() => {
-            setPrintSettings(settings);
-            // We keep the modal "open" in state, but hide it via CSS (@media print)
-            // so that window.print() can run immediately.
-        });
+        // Side Panel Workaround: Open in new tab to print
+        const sgf = getSGFString();
+        localStorage.setItem('gorw_temp_print_sgf', sgf);
+        localStorage.setItem('gorw_temp_print_settings', JSON.stringify(settings));
 
-        try {
-            window.print();
-        } catch (e) {
-            console.error('Print failed:', e);
-            alert('印刷の起動に失敗しました。');
-        } finally {
-            // Close modal after print dialog interaction is done
-            setShowPrintModal(false);
-        }
+        // Open new tab (relative path to index.html)
+        window.open('index.html?print_job=true', '_blank');
+
+        setShowPrintModal(false);
     };
+
+    // Print Job Initialization
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('print_job') === 'true') {
+            const sgf = localStorage.getItem('gorw_temp_print_sgf');
+            const settingsStr = localStorage.getItem('gorw_temp_print_settings');
+
+            if (sgf && settingsStr) {
+                // Determine if we need to load SGF (if not empty)
+                if (sgf.length > 20) { // Simple check if it's a valid SGF
+                    loadSGF(sgf);
+                }
+                setPrintSettings(JSON.parse(settingsStr));
+
+                // Wait for state to settle and then print
+                setTimeout(() => {
+                    document.title = "Print Preview - GORewrite";
+                    window.print();
+                    // Optional: Close after print? 
+                    // Better to leave open in case user wants to adjust printer settings and try again.
+                }, 800);
+            }
+        }
+    }, []);
 
     const loadSGF = (content: string) => {
         const { board: initialBoard, moves, size, metadata } = parseSGF(content);
