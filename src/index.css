@@ -11,3 +11,35 @@ body {
     padding: 0;
     overflow-x: hidden;
 }
+
+@media print {
+
+    /* Reset background colors for printing to save ink and look cleaner */
+    body,
+    .min-h-screen,
+    .bg-gray-100 {
+        background-color: white !important;
+        min-height: auto !important;
+        height: auto !important;
+        padding: 0 !important;
+    }
+
+    /* Ensure the board is visible and centered */
+    .bg-white.shadow-lg.p-2.rounded.mb-4.w-full {
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+
+    /* Maximize SVG size */
+    svg {
+        width: 100% !important;
+        height: auto !important;
+        max-height: 100vh !important;
+    }
+}

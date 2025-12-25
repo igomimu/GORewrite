@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import GoBoard, { ViewRange, BoardState, StoneColor, Marker } from './components/GoBoard'
+import GameInfoModal from './components/GameInfoModal'
+import PrintSettingsModal, { PrintSettings } from './components/PrintSettingsModal'
 import { exportToPng } from './utils/exportUtils'
 import { checkCaptures } from './utils/gameLogic'
 import { parseSGF, generateSGF } from './utils/sgfUtils'
+import { generatePrintFigures } from './utils/printUtils'
 
 // Chrome extension download API (type stub)
 declare const chrome: any;
@@ -28,7 +31,7 @@ type PlacementMode = 'SIMPLE' | 'NUMBERED';
 export type ToolMode = 'STONE' | 'LABEL' | 'SYMBOL';
 export type SymbolType = 'TRI' | 'CIR' | 'SQR' | 'X';
 
-interface HistoryState {
+export interface HistoryState {
     board: BoardState;
     nextNumber: number;
     activeColor: StoneColor;
@@ -1047,52 +1050,134 @@ function App() {
         await exportToPng(clone, 3, isMonochrome ? '#FFFFFF' : '#DCB35C');
     }, [hiddenMoves, showCoordinates, showCapturedInExport, isMonochrome]);
 
+    // Kifu Metadata
+    const [blackName, setBlackName] = useState('');
+    const [blackRank, setBlackRank] = useState('');
+    const [blackTeam, setBlackTeam] = useState('');
+    const [whiteName, setWhiteName] = useState('');
+    const [whiteRank, setWhiteRank] = useState('');
+    const [whiteTeam, setWhiteTeam] = useState('');
+    const [komi, setKomi] = useState('');
+    const [handicap, setHandicap] = useState('');
+    const [gameResult, setGameResult] = useState('');
+    const [gameDate, setGameDate] = useState('');
+    const [gamePlace, setGamePlace] = useState('');
+    const [gameEvent, setGameEvent] = useState('');
+    const [gameRound, setGameRound] = useState('');
+    const [gameTime, setGameTime] = useState('');
+    const [gameName, setGameName] = useState(''); // GN
+    const [gameUser, setGameUser] = useState('');
+    const [gameSource, setGameSource] = useState('');
+    const [gameComment, setGameComment] = useState('');
+    const [gameCopyright, setGameCopyright] = useState('');
+    const [gameAnnotation, setGameAnnotation] = useState('');
+
+    const [showGameInfoModal, setShowGameInfoModal] = useState(false);
+    const [showPrintModal, setShowPrintModal] = useState(false);
+    const [printSettings, setPrintSettings] = useState<PrintSettings | null>(null);
+
+    // Variable Substitution
+    const formatPrintString = (template: string, pageNum: number = 1) => {
+        let s = template;
+        s = s.replace(/%GN%/g, gameName || gameEvent || '');
+        s = s.replace(/%EV%/g, gameEvent || '');
+        s = s.replace(/%DT%/g, gameDate || '');
+        s = s.replace(/%PC%/g, gamePlace || '');
+        s = s.replace(/%PB%/g, blackName || '黒番');
+        s = s.replace(/%BR%/g, blackRank || '');
+        s = s.replace(/%PW%/g, whiteName || '白番');
+        s = s.replace(/%WR%/g, whiteRank || '');
+        s = s.replace(/%RE%/g, gameResult || '');
+        s = s.replace(/%KM%/g, komi || '');
+        s = s.replace(/%PAGE%/g, pageNum.toString());
+        return s;
+    };
+
+    const handlePrintRequest = async (settings: PrintSettings) => {
+        setPrintSettings(settings);
+        setShowPrintModal(false);
+
+        // Wait for render to update with new settings
+        await new Promise(r => setTimeout(r, 100));
+        window.print();
+    };
+
     const loadSGF = (content: string) => {
-        const { board: startBoard, moves, size: newSize } = parseSGF(content);
+        const { board: initialBoard, moves, size, metadata } = parseSGF(content);
+        setBoardSize(size);
 
-        // Initialize History with Start Board
-        const newHistory: HistoryState[] = [{
-            board: JSON.parse(JSON.stringify(startBoard)),
-            nextNumber: 1,
-            activeColor: 'BLACK',
-            boardSize: newSize
-        }];
+        // Metadata
+        if (metadata) {
+            setBlackName(metadata.blackName || '');
+            setBlackRank(metadata.blackRank || '');
+            setBlackTeam(metadata.blackTeam || '');
+            setWhiteName(metadata.whiteName || '');
+            setWhiteRank(metadata.whiteRank || '');
+            setWhiteTeam(metadata.whiteTeam || '');
+            setKomi(metadata.komi || '');
+            setHandicap(metadata.handicap || '');
+            setGameResult(metadata.result || '');
+            setGameDate(metadata.date || '');
+            setGamePlace(metadata.place || '');
+            setGameEvent(metadata.event || '');
+            setGameRound(metadata.round || '');
+            setGameTime(metadata.time || '');
+            setGameName(metadata.gameName || '');
+            setGameUser(metadata.user || '');
+            setGameSource(metadata.source || '');
+            setGameComment(metadata.gameComment || '');
+            setGameCopyright(metadata.copyright || '');
+            setGameAnnotation(metadata.annotation || '');
+        } else {
+            // Reset if no metadata found (or keep previous? usually reset)
+            setBlackName(''); setBlackRank(''); setBlackTeam('');
+            setWhiteName(''); setWhiteRank(''); setWhiteTeam('');
+            setKomi(''); setHandicap(''); setGameResult('');
+            setGameDate(''); setGamePlace(''); setGameEvent(''); setGameRound(''); setGameTime('');
+            setGameName(''); setGameUser(''); setGameSource(''); setGameComment(''); setGameCopyright(''); setGameAnnotation('');
+        }
 
-        // Simulate Moves to build History
-        let currentBoard = JSON.parse(JSON.stringify(startBoard));
-        let currentNumber = 1;
-        let currentColor: StoneColor = 'BLACK';
+        // Replay Logic
+        // 1. Initial State
+        const initialState: HistoryState = {
+            board: initialBoard,
+            nextNumber: 1, // Will be updated by replay
+            activeColor: 'BLACK', // Default start
+            boardSize: size
+        };
 
-        for (const move of moves) {
-            // Clone board for next state
-            const nextBoard = JSON.parse(JSON.stringify(currentBoard));
+        const newHistory = [initialState];
+        let currentBoard = JSON.parse(JSON.stringify(initialBoard)); // Deep copy
+        let moveNum = 1;
 
-            // Place Stone (1-based from parser)
-            if (move.x >= 1 && move.x <= newSize && move.y >= 1 && move.y <= newSize) {
-                nextBoard[move.y - 1][move.x - 1] = {
-                    color: move.color,
-                    number: currentNumber
-                };
+        // Note: initialBoard setup parsing in parseSGF handled AB/AW.
+        // Now apply moves.
 
-                // Check Captures
-                const captures = checkCaptures(nextBoard, move.x - 1, move.y - 1, move.color);
-                captures.forEach(c => {
-                    nextBoard[c.y][c.x] = null;
-                });
-            }
+        moves.forEach(move => {
+            const { x, y, color } = move;
+            // Place stone
+            currentBoard[y - 1][x - 1] = { color, number: moveNum };
 
-            // Prepare state for history
-            currentNumber++;
-            currentColor = move.color === 'BLACK' ? 'WHITE' : 'BLACK'; // Toggle for next
-            currentBoard = nextBoard;
+            // Check captures
+            // checkCaptures(board, x_0_indexed, y_0_indexed, color_of_stone_just_placed)
+            // It returns captured stones of OPPONENT color.
+            const captures = checkCaptures(currentBoard, x - 1, y - 1, color);
+            captures.forEach(c => {
+                currentBoard[c.y][c.x] = null;
+            });
+
+            // Add to history
+            // Prepare for next move: active color switches.
+            const nextActive = color === 'BLACK' ? 'WHITE' : 'BLACK';
 
             newHistory.push({
-                board: nextBoard,
-                nextNumber: currentNumber,
-                activeColor: currentColor,
-                boardSize: newSize
+                board: JSON.parse(JSON.stringify(currentBoard)),
+                nextNumber: moveNum + 1,
+                activeColor: nextActive,
+                boardSize: size
             });
-        }
+            moveNum++;
+        });
 
         // Update State
         setHistory(newHistory);
@@ -1343,8 +1428,38 @@ function App() {
             }
         }
 
-        return generateSGF(history[0].board, boardSize, nodes);
-    }, [history, currentMoveIndex, boardSize]);
+        const metadata: import('./utils/sgfUtils').SgfMetadata = {
+            blackName,
+            blackRank,
+            blackTeam,
+            whiteName,
+            whiteRank,
+            whiteTeam,
+            komi,
+            handicap,
+            result: gameResult,
+            date: gameDate,
+            place: gamePlace,
+            event: gameEvent,
+            round: gameRound,
+            time: gameTime,
+            gameName,
+            user: gameUser,
+            source: gameSource,
+            gameComment,
+            copyright: gameCopyright,
+            annotation: gameAnnotation
+        };
+
+        return generateSGF(history[0].board, boardSize, nodes, metadata);
+    }, [history, currentMoveIndex, boardSize,
+        blackName, blackRank, blackTeam,
+        whiteName, whiteRank, whiteTeam,
+        komi, handicap, gameResult, gameDate,
+        gamePlace, gameEvent, gameRound, gameTime,
+        gameName, gameUser, gameSource,
+        gameComment, gameCopyright, gameAnnotation
+    ]);
 
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -1601,6 +1716,12 @@ function App() {
                             console.error('Failed to copy SGF', err);
                         }
                         break;
+                    case 'p': // Ctrl+P
+                        if (e.ctrlKey || e.metaKey) {
+                            e.preventDefault();
+                            setShowPrintModal(true);
+                        }
+                        break;
                     // Ctrl+V is handled by 'paste' event listener
                 }
             }
@@ -1628,13 +1749,128 @@ function App() {
 
 
 
+    // --- Drag & Drop Implementation ---
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer.types.includes('Files')) {
+            setIsDragging(true);
+            e.dataTransfer.dropEffect = 'copy';
+        }
+    }, []);
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Only reset if leaving the window/container
+        // Check relatedTarget to avoid flickering when moving over child elements
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+        setIsDragging(false);
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            // Simple check for extension or rely on user knowing it's SGF
+            if (file.name.toLowerCase().endsWith('.sgf') || file.name.toLowerCase().endsWith('.txt')) { // Allow txt too for convenience
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const content = event.target?.result;
+                    if (typeof content === 'string') {
+                        loadSGF(content);
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                alert('SGF files only (.sgf)');
+            }
+        }
+    }, [loadSGF]);
+
+
     return (
-        <div className="p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none">
+        <div
+            className={`p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none relative ${isDragging ? 'bg-blue-50 outline outline-4 outline-blue-400 outline-offset-[-4px]' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            {/* Overlay for "Drop File Here" visual feedback */}
+            {isDragging && (
+                <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-blue-100 bg-opacity-50">
+                    <div className="text-4xl font-bold text-blue-600 bg-white p-8 rounded-xl shadow-lg border-4 border-blue-400">
+                        Drop SGF File Here
+                    </div>
+                </div>
+            )}
+
+            {/* Print Area (Hidden on Screen) */}
+            <div className="hidden print:block w-full font-serif text-sm">
+                {/* Mode A: Current Board (Similar to what we had, but using settings) */}
+                {(!printSettings || printSettings.pagingType === 'CURRENT') && (
+                    <div className="flex flex-col items-center w-full h-screen">
+                        {/* Header Area */}
+                        <div className="w-full mb-4 text-center">
+                            <h1 className="text-2xl font-bold mb-1">{formatPrintString(printSettings?.title || '%GN%')}</h1>
+                            <h2 className="text-lg text-gray-600">{formatPrintString(printSettings?.subTitle || '%DT%')}</h2>
+                            <div className="text-right text-xs text-gray-500 mt-2 border-b border-gray-400">
+                                {formatPrintString(printSettings?.header || '')}
+                            </div>
+                        </div>
+
+                        {/* Board acts as "Current View" */}
+                        <div className="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] border-2 border-black">
+                            {/* We just duplicate the board rendering here for simplicity or rely on a shared component. 
+                                Since GoBoard is complex with props, maybe we can re-use the Current Board state. 
+                            */}
+                            {/* Wait, the previous code just hid the controls. 
+                                Now we are wrapping the print view. 
+                                Let's just render the GoBoard with "View Mode" settings.
+                            */}
+                            <GoBoard
+                                boardState={board}
+                                boardSize={boardSize}
+                                showCoordinates={printSettings?.showCoordinate ?? showCoordinates}
+                                showNumbers={printSettings?.showMoveNumber ?? showNumbers}
+                                markers={history[currentMoveIndex].markers}
+                                onCellClick={() => { }}
+                                onCellRightClick={() => { }}
+                                onBoardWheel={() => { }}
+                                onCellMouseEnter={() => { }}
+                                onCellMouseLeave={() => { }}
+                                onDragStart={() => { }}
+                                onDragMove={() => { }}
+                                selectionStart={null}
+                                isMonochrome={isMonochrome}
+                            />
+                        </div>
+
+                        {/* Footer */}
+                        <div className="w-full text-center text-xs mt-auto pb-4">
+                            {formatPrintString(printSettings?.footer || '')}
+                        </div>
+                    </div>
+                )}
+            </div>
             <div className="flex justify-between w-full items-center mb-2">
                 <div className="flex items-baseline gap-2">
                     <span className="text-xs text-gray-400 font-normal pl-1">v34.0</span>
                 </div>
                 <div className="flex gap-2 items-center">
+                    <button
+                        onClick={() => setShowPrintModal(true)}
+                        className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center font-bold text-lg"
+                        title="Print (Ctrl+P)"
+                    >
+                        🖨️
+                    </button>
                     {/* Hidden Input for Open SGF */}
                     <input
                         type="file"
@@ -1793,6 +2029,123 @@ function App() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Print Settings Modal */}
+            <PrintSettingsModal
+                isOpen={showPrintModal}
+                onClose={() => setShowPrintModal(false)}
+                onPrint={handlePrintRequest}
+            />
+
+            {/* Actual Print Content (Replaces previous simple print view) */}
+            <div className="hidden print:block w-full font-serif text-sm">
+                {/* Mode A: Current Board (Similar to what we had, but using settings) */}
+                {(!printSettings || printSettings.pagingType === 'CURRENT') && (
+                    <div className="flex flex-col items-center w-full h-screen">
+                        {/* Header Area */}
+                        <div className="w-full mb-4 text-center">
+                            <h1 className="text-2xl font-bold mb-1">{formatPrintString(printSettings?.title || '%GN%')}</h1>
+                            <h2 className="text-lg text-gray-600">{formatPrintString(printSettings?.subTitle || '%DT%')}</h2>
+                            <div className="text-right text-xs text-gray-500 mt-2 border-b border-gray-400">
+                                {formatPrintString(printSettings?.header || '')}
+                            </div>
+                        </div>
+
+                        {/* Board acts as "Current View", so we just let the main board render. 
+                            BUT, main board is hidden by default styles? 
+                            We need to ensure the main board is VISIBLE in print if 'CURRENT'. 
+                            Actually, my previous CSS hid everything *except* the board. 
+                            Now I want to control it more. 
+                            Let's use a specific container for the print view. 
+                        */}
+                    </div>
+                )}
+
+                {/* Mode B: Whole File */}
+                {printSettings?.pagingType === 'WHOLE_FILE_FIGURE' && (
+                    <div className="flex flex-col items-center w-full">
+                        {generatePrintFigures(history, printSettings.movesPerFigure).map((fig, idx) => (
+                            <div key={idx} className="page-break flex flex-col items-center justify-center w-full h-screen">
+                                {/* Header */}
+                                <div className="w-full mb-2 text-center">
+                                    <h1 className="text-xl font-bold">{formatPrintString(printSettings.title, idx + 1)}</h1>
+                                    <h2 className="text-sm text-gray-600">{formatPrintString(printSettings.subTitle, idx + 1)}</h2>
+                                    <div className="text-right text-xs text-gray-500 mt-1 border-b border-gray-400">
+                                        {formatPrintString(printSettings.header, idx + 1)}
+                                    </div>
+                                </div>
+
+                                {/* Figure Info */}
+                                <div className="w-full text-center font-bold mb-2">
+                                    Figure {idx + 1} ({fig.moveRangeStart}-{fig.moveRangeEnd})
+                                </div>
+
+                                {/* Board */}
+                                <div className="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px]">
+                                    <GoBoard
+                                        boardState={fig.board}
+                                        boardSize={boardSize}
+                                        showCoordinates={printSettings.showCoordinate}
+                                        /* ruler is omitted as it behaves like coordinates in some contexts but here we rely on showCoordinates */
+                                        onCellClick={() => { }}
+                                        onCellRightClick={() => { }}
+                                        onBoardWheel={() => { }}
+                                        onCellMouseEnter={() => { }}
+                                        onCellMouseLeave={() => { }}
+                                        onDragStart={() => { }}
+                                        onDragMove={() => { }}
+
+                                        /* Required props */
+                                        selectionStart={null}
+                                    />
+                                </div>
+
+                                {/* Footer */}
+                                <div className="w-full text-center text-xs mt-auto pb-4">
+                                    {formatPrintString(printSettings.footer, idx + 1)}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Game Metadata Inputs (Replaced with Modal Trigger) */}
+            <div className="w-full mb-2 flex justify-start print:hidden">
+                <button
+                    onClick={() => setShowGameInfoModal(true)}
+                    className="flex items-center gap-1 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded px-3 py-1 text-gray-700"
+                >
+                    <span>ℹ️</span>
+                    <span>Game Info...</span>
+                </button>
+            </div>
+
+            {showGameInfoModal && (
+                <GameInfoModal
+                    onClose={() => setShowGameInfoModal(false)}
+                    blackName={blackName} setBlackName={setBlackName}
+                    blackRank={blackRank} setBlackRank={setBlackRank}
+                    blackTeam={blackTeam} setBlackTeam={setBlackTeam}
+                    whiteName={whiteName} setWhiteName={setWhiteName}
+                    whiteRank={whiteRank} setWhiteRank={setWhiteRank}
+                    whiteTeam={whiteTeam} setWhiteTeam={setWhiteTeam}
+                    komi={komi} setKomi={setKomi}
+                    handicap={handicap} setHandicap={setHandicap}
+                    result={gameResult} setResult={setGameResult}
+                    gameName={gameName} setGameName={setGameName}
+                    event={gameEvent} setEvent={setGameEvent}
+                    date={gameDate} setDate={setGameDate}
+                    place={gamePlace} setPlace={setGamePlace}
+                    round={gameRound} setRound={setGameRound}
+                    time={gameTime} setTime={setGameTime}
+                    user={gameUser} setUser={setGameUser}
+                    source={gameSource} setSource={setGameSource}
+                    gameComment={gameComment} setGameComment={setGameComment}
+                    copyright={gameCopyright} setCopyright={setGameCopyright}
+                    annotation={gameAnnotation} setAnnotation={setGameAnnotation}
+                />
             )}
 
             {/* Visual Style Toolbar */}
