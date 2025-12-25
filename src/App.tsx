@@ -943,7 +943,8 @@ function App() {
                 text.setAttribute('dy', '.35em');
                 text.setAttribute('text-anchor', 'middle');
                 text.setAttribute('fill', stone.color === 'BLACK' ? 'white' : 'black');
-                text.setAttribute('font-size', '26');
+                const fontSize = (stone.text && stone.text.length >= 3) ? '18' : '26';
+                text.setAttribute('font-size', fontSize);
                 text.setAttribute('font-family', 'Arial, sans-serif');
                 text.setAttribute('font-weight', 'bold');
                 text.textContent = stone.text;

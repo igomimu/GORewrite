@@ -321,7 +321,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                                 dy=".35em"
                                 textAnchor="middle"
                                 fill={isBlack ? "white" : "black"}
-                                fontSize={FONT_SIZE}
+                                fontSize={(displayText && displayText.length >= 3) ? CELL_SIZE * 0.45 : FONT_SIZE}
                                 fontFamily="Arial, sans-serif"
                                 fontWeight="bold"
                                 style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}
@@ -526,7 +526,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                                 return (
                                     <g key={`l-${idx}`}>
                                         <circle cx={stoneX} cy={0} r={RADIUS} fill={stone.color === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
-                                        <text x={stoneX} y={0} dy=".35em" textAnchor="middle" fill={stone.color === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{stone.text}</text>
+                                        <text x={stoneX} y={0} dy=".35em" textAnchor="middle" fill={stone.color === 'BLACK' ? 'white' : 'black'} fontSize={(stone.text && stone.text.length >= 3) ? CELL_SIZE * 0.45 : FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{stone.text}</text>
                                     </g>
                                 );
                             });
@@ -543,7 +543,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
 
                                     {/* Right Stone (Label) */}
                                     <circle cx={rightStartX + 30} cy={0} r={RADIUS} fill={rColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
-                                    <text x={rightStartX + 30} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? 'white' : 'black'} fontSize={FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{item.right.text}</text>
+                                    <text x={rightStartX + 30} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? 'white' : 'black'} fontSize={(item.right.text && item.right.text.length >= 3) ? CELL_SIZE * 0.45 : FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{item.right.text}</text>
 
                                     {/* Bracket Close */}
                                     <text x={rightStartX + 60} y={8} fontSize="20" fill="black" fontFamily="sans-serif">]</text>
