@@ -415,13 +415,7 @@ function App() {
         }
     };
 
-    const handleIndicatorDoubleClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const newColor = activeColor === 'BLACK' ? 'WHITE' : 'BLACK';
-        const newHistory = [...history];
-        newHistory[currentMoveIndex] = { ...newHistory[currentMoveIndex], activeColor: newColor };
-        setHistory(newHistory);
-    };
+
 
     const stepBack = () => { if (currentMoveIndex > 0) setCurrentMoveIndex(i => i - 1); };
     const stepForward = () => { if (currentMoveIndex < history.length - 1) setCurrentMoveIndex(i => i + 1); };
@@ -2033,7 +2027,6 @@ function App() {
                 <div>**Ctrl+V: Paste SGF**</div>
             </div>
         </div>
-    </div >
 
     );
 }
