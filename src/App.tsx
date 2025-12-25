@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { flushSync } from 'react-dom'
 import GoBoard, { ViewRange, BoardState, StoneColor, Marker } from './components/GoBoard'
 import GameInfoModal from './components/GameInfoModal'
 import PrintSettingsModal, { PrintSettings } from './components/PrintSettingsModal'
@@ -54,6 +55,7 @@ function App() {
     };
 
     const [toolMode, setToolMode] = useState<ToolMode>('STONE');
+    const [isPrintJob, setIsPrintJob] = useState(false);
     const [nextLabelChar, setNextLabelChar] = useState<string>('A');
     const [selectedSymbol, setSelectedSymbol] = useState<SymbolType>('TRI');
 
@@ -1112,7 +1114,15 @@ function App() {
         localStorage.setItem('gorw_temp_print_settings', JSON.stringify(settings));
 
         // Open new tab (relative path to index.html)
-        window.open('index.html?print_job=true', '_blank');
+        const printWindow = window.open('index.html?print_job=true', '_blank');
+        if (!printWindow) {
+            flushSync(() => {
+                setPrintSettings(settings);
+                setShowPrintModal(false);
+            });
+            window.print();
+            return;
+        }
 
         setShowPrintModal(false);
     };
@@ -1121,23 +1131,35 @@ function App() {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get('print_job') === 'true') {
+            setIsPrintJob(true);
             const sgf = localStorage.getItem('gorw_temp_print_sgf');
             const settingsStr = localStorage.getItem('gorw_temp_print_settings');
 
             if (sgf && settingsStr) {
                 // Determine if we need to load SGF (if not empty)
                 if (sgf.length > 20) { // Simple check if it's a valid SGF
-                    loadSGF(sgf);
+                    try {
+                        loadSGF(sgf);
+                    } catch (e) {
+                        alert("Failed to load SGF data: " + e);
+                    }
                 }
                 setPrintSettings(JSON.parse(settingsStr));
 
-                // Wait for state to settle and then print
-                setTimeout(() => {
+                const triggerPrint = () => {
                     document.title = "Print Preview - GORewrite";
+                    window.focus();
                     window.print();
-                    // Optional: Close after print? 
+                    // Optional: Close after print?
                     // Better to leave open in case user wants to adjust printer settings and try again.
-                }, 800);
+                };
+
+                // Wait for state to settle and then print
+                if (document.readyState === 'complete') {
+                    setTimeout(triggerPrint, 2000);
+                } else {
+                    window.addEventListener('load', () => setTimeout(triggerPrint, 2000), { once: true });
+                }
             }
         }
     }, []);
@@ -1837,7 +1859,7 @@ function App() {
 
     return (
         <div
-            className={`p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none relative ${isDragging ? 'bg-blue-50 outline outline-4 outline-blue-400 outline-offset-[-4px]' : ''}`}
+            className={`p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none relative ${isDragging ? 'bg-blue-50 outline outline-4 outline-blue-400 outline-offset-[-4px]' : ''} ${isPrintJob ? '!hidden' : ''}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -2084,7 +2106,15 @@ function App() {
             />
 
             {/* Actual Print Content (Replaces previous simple print view) */}
-            <div className="hidden print:block w-full font-serif text-sm">
+            <div className={isPrintJob ? "block w-full font-serif text-sm" : "hidden print:block w-full font-serif text-sm"}>
+                {isPrintJob && (
+                    <div className="fixed top-0 left-0 w-full bg-blue-100 p-2 text-center print:hidden z-50 flex justify-center gap-4 items-center shadow-md">
+                        <span className="font-bold text-blue-900">Print Preview</span>
+                        <button onClick={() => window.print()} className="px-4 py-1.5 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow transition-colors text-sm flex items-center gap-2">
+                            <span>🖨️</span> Print Now
+                        </button>
+                    </div>
+                )}
                 {/* Mode A: Current Board (Similar to what we had, but using settings) */}
                 {(!printSettings || printSettings.pagingType === 'CURRENT') && (
                     <div className="flex flex-col items-center w-full h-screen">
