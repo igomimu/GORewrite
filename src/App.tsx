@@ -1138,8 +1138,7 @@ function App() {
             const settingsStr = localStorage.getItem('gorw_temp_print_settings');
 
             if (sgf && settingsStr) {
-                // Determine if we need to load SGF (if not empty)
-                if (sgf.length > 20) { // Simple check if it's a valid SGF
+                if (sgf.length > 20) {
                     try {
                         loadSGF(sgf);
                         const savedIndex = localStorage.getItem('gorw_temp_print_index');
@@ -1152,20 +1151,11 @@ function App() {
                 }
                 setPrintSettings(JSON.parse(settingsStr));
 
-                const triggerPrint = () => {
-                    document.title = "Print Preview - GORewrite";
-                    window.focus();
-                    window.print();
-                    // Optional: Close after print?
-                    // Better to leave open in case user wants to adjust printer settings and try again.
-                };
+                // Set title
+                document.title = "Print Preview - GORewrite";
 
-                // Wait for state to settle and then print
-                if (document.readyState === 'complete') {
-                    setTimeout(triggerPrint, 2000);
-                } else {
-                    window.addEventListener('load', () => setTimeout(triggerPrint, 2000), { once: true });
-                }
+                // Auto-print removed to prevent "unresponsive" issues. 
+                // User can click "Print Now" button.
             }
         }
     }, []);
@@ -1206,10 +1196,10 @@ function App() {
         }
 
         // Replay Logic
-        // 1. Initial State
+        // 1. Initial State (Setup)
         const initialState: HistoryState = {
-            board: initialBoard,
-            nextNumber: 1, // Will be updated by replay
+            board: initialBoard, // This contains AB/AW setup
+            nextNumber: 1,
             activeColor: 'BLACK', // Default start
             boardSize: size
         };
@@ -1218,24 +1208,25 @@ function App() {
         let currentBoard = JSON.parse(JSON.stringify(initialBoard)); // Deep copy
         let moveNum = 1;
 
-        // Note: initialBoard setup parsing in parseSGF handled AB/AW.
-        // Now apply moves.
-
+        // 2. Iterate Moves
         moves.forEach(move => {
             const { x, y, color } = move;
+
+            // Validate stats
+            if (x < 1 || x > size || y < 1 || y > size) return;
+
             // Place stone
+            // Ensure we don't overwrite if not empty? standard SGF allows overwrite.
             currentBoard[y - 1][x - 1] = { color, number: moveNum };
 
             // Check captures
-            // checkCaptures(board, x_0_indexed, y_0_indexed, color_of_stone_just_placed)
-            // It returns captured stones of OPPONENT color.
+            // Note: checkCaptures expects 0-indexed coords
             const captures = checkCaptures(currentBoard, x - 1, y - 1, color);
             captures.forEach(c => {
                 currentBoard[c.y][c.x] = null;
             });
 
-            // Add to history
-            // Prepare for next move: active color switches.
+            // Prepare next state
             const nextActive = color === 'BLACK' ? 'WHITE' : 'BLACK';
 
             newHistory.push({
@@ -1247,9 +1238,11 @@ function App() {
             moveNum++;
         });
 
-        // Update State
+        // Update State (Batch update)
         setHistory(newHistory);
-        setCurrentMoveIndex(0); // Start at Initial Setup
+
+        // Reset to 0 (Start) initially, but caller might override to current index
+        setCurrentMoveIndex(0);
     };
 
 
