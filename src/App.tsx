@@ -1073,7 +1073,7 @@ function App() {
 
         const bgColor = isMonochrome ? '#FFFFFF' : '#DCB35C';
         if (isSvgMode) {
-            await exportToSvg(clone, 'goban_export.svg', bgColor);
+            await exportToSvg(clone, bgColor);
         } else {
             await exportToPng(clone, 3, bgColor);
         }
@@ -1306,7 +1306,7 @@ function App() {
 
             const performExportAction = async (element: SVGSVGElement) => {
                 if (isSvg) {
-                    await exportToSvg(element, 'goban_export.svg', isMonochrome ? '#FFFFFF' : '#DCB35C');
+                    await exportToSvg(element, isMonochrome ? '#FFFFFF' : '#DCB35C');
                 } else {
                     await exportToPng(element, 3, isMonochrome ? '#FFFFFF' : '#DCB35C');
                 }
@@ -1975,7 +1975,7 @@ function App() {
 
                         <div className="flex bg-indigo-50 rounded-full items-center p-0.5 border border-indigo-100">
                             <button onClick={() => { if (selectionStart && selectionEnd) handleExportSelection(); else handleExport(); }}
-                                title={`Export as ${exportMode} (Click to save)`} className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center font-bold transition-colors">
+                                title={`Copy as ${exportMode} (Click to Copy)`} className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center font-bold transition-colors">
                                 📷
                             </button>
                             <button

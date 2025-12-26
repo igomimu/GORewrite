@@ -99,6 +99,8 @@ export async function exportToPng(svgElement: SVGSVGElement, scale = 1, backgrou
         const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
         if (!blob) throw new Error('Could not generate PNG blob');
 
+        // Ensure focus for Clipboard API
+        window.focus();
         await navigator.clipboard.write([
             new ClipboardItem({ 'image/png': blob })
         ]);
@@ -113,7 +115,11 @@ export async function exportToPng(svgElement: SVGSVGElement, scale = 1, backgrou
  * Exports an SVG element as an SVG file download.
  * Useful for high-quality printing or editing in vector software.
  */
-export async function exportToSvg(svgElement: SVGSVGElement, filename = 'go_board.svg', backgroundColor = '#DCB35C'): Promise<void> {
+/**
+ * Exports an SVG element to the system clipboard as SVG text.
+ * Matches PNG behavior (Copy instead of Download).
+ */
+export async function exportToSvg(svgElement: SVGSVGElement, backgroundColor = '#DCB35C'): Promise<void> {
     const clone = svgElement.cloneNode(true) as SVGSVGElement;
 
     // Remove "data-export-ignore" elements
@@ -135,30 +141,39 @@ export async function exportToSvg(svgElement: SVGSVGElement, filename = 'go_boar
     clone.setAttribute('width', `${width}px`);
     clone.setAttribute('height', `${height}px`);
 
-    // Explicitly set background color on the SVG root logic if needed
-    // Typically SVG background is transparent unless a rect is behind.
-    // However, we want to match PNG look.
-    // GoBoard component might not have a bg rect.
-    // Let's wrap content in a group and put a rect behind it? 
-    // Or just set style on svg (which transparency might ignore in some viewers, but inkscape handles).
-    // Better: Add a rect as the first child if not present.
-    // But simplistic approach: style.backgroundColor.
+    // Set background color
     clone.style.backgroundColor = backgroundColor;
 
     // Serialize
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(clone);
-    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
 
-    // Trigger Download
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Copy to Clipboard (Hybrid: SVG Image + Text)
+    try {
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+        const textBlob = new Blob([svgString], { type: 'text/plain' });
 
-    // Cleanup
-    setTimeout(() => URL.revokeObjectURL(url), 100);
+        // Ensure focus for Clipboard API
+        window.focus();
+
+        await navigator.clipboard.write([
+            new ClipboardItem({
+                'text/plain': textBlob,
+                // Note: 'image/svg+xml' support varies by platform/app.
+                // If this fails, we might need to fall back to just text or tell user to use PNG.
+                'image/svg+xml': svgBlob
+            })
+        ]);
+        console.log('SVG content copied to clipboard (Image+Text).');
+    } catch (error) {
+        console.error('Failed to copy SVG to clipboard:', error);
+        // Fallback to text only if the complex write fails
+        try {
+            window.focus();
+            await navigator.clipboard.writeText(svgString);
+            console.log('Fallback: SVG text copied to clipboard.');
+        } catch (e2) {
+            alert('Failed to copy SVG. Please check permissions.');
+        }
+    }
 }
