@@ -3,7 +3,8 @@ import { flushSync } from 'react-dom'
 import GoBoard, { ViewRange, BoardState, StoneColor, Marker, Stone } from './components/GoBoard'
 import GameInfoModal from './components/GameInfoModal'
 import PrintSettingsModal, { PrintSettings } from './components/PrintSettingsModal'
-import { exportToPng, exportToSvg, svgToPngBlob, saveFile, prepareSvgForExport, promptSaveFile, writeToHandle } from './utils/exportUtils'
+import { exportToSvg, exportToPng, getFileHandle, writeToHandle, saveFile, svgToPngBlob } from './utils/exportUtils';
+import { prepareSvgForExport } from './utils/exportUtils';
 import { createGifFromImages } from './utils/gifExportUtils'
 import { checkCaptures } from './utils/gameLogic'
 import { parseSGFTree, generateSGFTree, SgfTreeNode } from './utils/sgfUtils'
@@ -1237,12 +1238,7 @@ function App() {
                     }
                 }
             }
-
-
         }
-
-
-
     });
 
     // Sort footer by move number (of the hidden move)
@@ -1303,8 +1299,8 @@ function App() {
                 circle.setAttribute('cx', cx.toString());
                 circle.setAttribute('cy', cy.toString());
                 circle.setAttribute('r', '18.4');
-                circle.setAttribute('fill', stone.color === 'BLACK' ? 'black' : 'white');
-                circle.setAttribute('stroke', 'black');
+                circle.setAttribute('fill', stone.color === 'BLACK' ? '#000001' : '#FEFEFE');
+                circle.setAttribute('stroke', '#000001');
                 circle.setAttribute('stroke-width', stone.color === 'BLACK' ? '2' : '0.7');
 
                 const text = document.createElementNS(svgNS, 'text');
@@ -1312,7 +1308,7 @@ function App() {
                 text.setAttribute('y', cy.toString());
                 text.setAttribute('dy', '.35em');
                 text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('fill', stone.color === 'BLACK' ? 'white' : 'black');
+                text.setAttribute('fill', stone.color === 'BLACK' ? '#FEFEFE' : '#000001');
                 const fontSize = (stone.text && stone.text.length >= 3) ? '18' : '26';
                 text.setAttribute('font-size', fontSize);
                 text.setAttribute('font-family', 'Arial, sans-serif');
@@ -1364,7 +1360,7 @@ function App() {
                 text.textContent = sl.label;
 
                 // Add a white halo for visibility on black stones
-                text.setAttribute('stroke', 'white');
+                text.setAttribute('stroke', '#FEFEFE');
                 text.setAttribute('stroke-width', '0.5');
 
                 g.appendChild(text);
@@ -1376,7 +1372,7 @@ function App() {
         // const svgNS declared above
 
 
-        const bgColor = isMonochrome ? '#FFFFFF' : '#DCB35C';
+        const bgColor = isMonochrome ? '#FEFEFE' : '#DCB35D';
 
         // ... Existing Footer Logic ...
         if (hiddenMoves.length > 0) {
@@ -1464,8 +1460,8 @@ function App() {
                     c.setAttribute('cx', drawX.toString());
                     c.setAttribute('cy', '0');
                     c.setAttribute('r', '18.4');
-                    c.setAttribute('fill', visStone.color === 'BLACK' ? 'black' : 'white');
-                    c.setAttribute('stroke', 'black');
+                    c.setAttribute('fill', visStone.color === 'BLACK' ? '#000001' : '#FEFEFE');
+                    c.setAttribute('stroke', '#000001');
                     c.setAttribute('stroke-width', visStone.color === 'BLACK' ? '2' : '0.7');
                     itemG.appendChild(c);
 
@@ -1474,7 +1470,7 @@ function App() {
                     t.setAttribute('y', '0');
                     t.setAttribute('dy', '.35em');
                     t.setAttribute('text-anchor', 'middle');
-                    t.setAttribute('fill', visStone.color === 'BLACK' ? 'white' : 'black');
+                    t.setAttribute('fill', visStone.color === 'BLACK' ? '#FEFEFE' : '#000001');
                     const fs = (visStone.text && visStone.text.length >= 3) ? '18' : '26';
                     t.setAttribute('font-size', fs);
                     t.setAttribute('font-family', 'Arial, sans-serif');
@@ -1491,7 +1487,7 @@ function App() {
                 openB.setAttribute('y', '0');
                 openB.setAttribute('dy', '.35em');
                 openB.setAttribute('text-anchor', 'middle');
-                openB.setAttribute('fill', 'black');
+                openB.setAttribute('fill', '#000001');
                 openB.setAttribute('font-size', '24');
                 openB.setAttribute('font-weight', 'bold');
                 openB.textContent = "[";
@@ -1527,8 +1523,8 @@ function App() {
                         c.setAttribute('cx', stoneCenterX.toString());
                         c.setAttribute('cy', '0');
                         c.setAttribute('r', '18.4');
-                        c.setAttribute('fill', (hidStone.color === 'BLACK') ? 'black' : 'white');
-                        c.setAttribute('stroke', 'black');
+                        c.setAttribute('fill', (hidStone.color === 'BLACK') ? '#000001' : '#FEFEFE');
+                        c.setAttribute('stroke', '#000001');
                         c.setAttribute('stroke-width', (hidStone.color === 'BLACK' ? '2' : '0.7'));
                         itemG.appendChild(c);
 
@@ -1537,7 +1533,7 @@ function App() {
                         t.setAttribute('y', '0');
                         t.setAttribute('dy', '.35em');
                         t.setAttribute('text-anchor', 'middle');
-                        t.setAttribute('fill', (hidStone.color === 'BLACK') ? 'white' : 'black');
+                        t.setAttribute('fill', (hidStone.color === 'BLACK') ? '#FEFEFE' : '#000001');
                         const fs = (hidStone.text && hidStone.text.length >= 3) ? '18' : '26';
                         t.setAttribute('font-size', fs);
                         t.setAttribute('font-family', 'Arial, sans-serif');
@@ -1554,7 +1550,7 @@ function App() {
                 closeB.setAttribute('y', '0');
                 closeB.setAttribute('dy', '.35em');
                 closeB.setAttribute('text-anchor', 'middle');
-                closeB.setAttribute('fill', 'black');
+                closeB.setAttribute('fill', '#000001');
                 closeB.setAttribute('font-size', '24');
                 closeB.setAttribute('font-weight', 'bold');
                 closeB.textContent = "]";
@@ -1594,8 +1590,8 @@ function App() {
                 c.setAttribute('cx', cx.toString());
                 c.setAttribute('cy', cy.toString());
                 c.setAttribute('r', '18.4');
-                c.setAttribute('fill', stone.color === 'BLACK' ? 'black' : 'white');
-                c.setAttribute('stroke', 'black');
+                c.setAttribute('fill', stone.color === 'BLACK' ? '#000001' : '#FEFEFE');
+                c.setAttribute('stroke', '#000001');
                 c.setAttribute('stroke-width', stone.color === 'BLACK' ? '2' : '0.7');
                 stoneGroup.appendChild(c);
 
@@ -1604,7 +1600,7 @@ function App() {
                 t.setAttribute('y', cy.toString());
                 t.setAttribute('dy', '.35em');
                 t.setAttribute('text-anchor', 'middle');
-                t.setAttribute('fill', stone.color === 'BLACK' ? 'white' : 'black');
+                t.setAttribute('fill', stone.color === 'BLACK' ? '#FEFEFE' : '#000001');
                 const fontSize = (stone.text && stone.text.length >= 3) ? '18' : '26';
                 t.setAttribute('font-size', fontSize);
                 t.setAttribute('font-family', 'Arial, sans-serif');
@@ -1638,7 +1634,7 @@ function App() {
         } else {
             await exportToPng(clone, { scale: 3, backgroundColor: bgColor, destination: destination, filename });
         }
-    }, [hiddenMoves, stonesToDraw, showCoordinates, showCapturedInExport, isMonochrome, specialLabels]);
+    }, [hiddenMoves, stonesToDraw, showCoordinates, showCapturedInExport, isMonochrome, specialLabels, boardSize]);
 
 
     const handleExport = useCallback(async (forcedMode?: 'SVG' | 'PNG', destination?: 'CLIPBOARD' | 'DOWNLOAD') => {
@@ -1703,7 +1699,7 @@ function App() {
         let handle = null;
         try {
             // Force empty filename preference
-            handle = await promptSaveFile('image/gif', '');
+            handle = await getFileHandle('image/gif', '');
             if (!handle && !('showSaveFilePicker' in window)) {
                 // Not supported, proceed to old flow
             } else if (!handle) {

@@ -1,47 +1,46 @@
 declare const chrome: any;
 
-const COLOR_NAME_MAP: Record<string, string> = {
-    black: '#000000',
-    white: '#FFFFFF',
-    '#000': '#000000',
-    '#fff': '#FFFFFF',
-};
+// COLOR_NAME_MAP removed, replaced by normalizeSvgColors internal logic
+// normalizeColorValue deprecated
 
-function normalizeColorValue(value: string): string | null {
-    const trimmed = value.trim();
-    const lower = trimmed.toLowerCase();
-    return COLOR_NAME_MAP[lower] || null;
-}
+const OFF_BLACK = '#000001';
+const OFF_WHITE = '#FEFEFE';
 
 function normalizeSvgColors(svgElement: SVGSVGElement): void {
     const attributesToNormalize = ['fill', 'stroke', 'color', 'stop-color'];
     const elements = svgElement.querySelectorAll('*');
 
+    // 1. Force Root Background (Simple)
+    if (svgElement.style) {
+        svgElement.style.backgroundColor = OFF_WHITE;
+    }
+
     elements.forEach(el => {
+        // 2. Normalize Attributes to Off-Colors
         attributesToNormalize.forEach(attr => {
             const value = el.getAttribute(attr);
             if (!value) return;
-            const normalized = normalizeColorValue(value);
-            if (normalized) {
-                el.setAttribute(attr, normalized);
+            const lower = value.toLowerCase().trim();
+            if (lower === 'black' || lower === '#000' || lower === '#000000') {
+                el.setAttribute(attr, OFF_BLACK);
+            } else if (lower === 'white' || lower === '#fff' || lower === '#ffffff') {
+                el.setAttribute(attr, OFF_WHITE);
             }
         });
 
-        const style = el.getAttribute('style');
-        if (style) {
-            const updated = style.replace(
-                /\b(fill|stroke|color)\s*:\s*(black|white)\b/gi,
-                (_match, prop, color) => {
-                    const normalized = normalizeColorValue(color);
-                    return normalized ? `${prop}: ${normalized}` : _match;
-                }
-            );
-            if (updated !== style) {
-                el.setAttribute('style', updated);
+        // 3. Normalize Inline Styles (Attribute replacement ONLY)
+        const element = el as HTMLElement;
+        if (element.style) {
+            const style = el.getAttribute('style') || '';
+            if (style.includes('fill:') || style.includes('stroke:') || style.includes('color:')) {
+                const newStyle = style.replace(/black/gi, OFF_BLACK).replace(/#000000/gi, OFF_BLACK)
+                    .replace(/white/gi, OFF_WHITE).replace(/#ffffff/gi, OFF_WHITE);
+                el.setAttribute('style', newStyle);
             }
         }
     });
 }
+
 
 
 /**
@@ -95,9 +94,10 @@ export function prepareSvgForExport(svgElement: SVGSVGElement, options: { backgr
     clone.setAttribute('width', `${width}px`);
     clone.setAttribute('height', `${height}px`);
 
-    // HOTFIX: Explicitly reset filters and color-scheme to defeat Dark Reader or other extensions
-    clone.style.filter = 'none';
-    clone.style.colorScheme = 'light';
+    // HOTFIX: Simplified styles for Word
+    // Removing filter/color-scheme as they cause import errors
+    clone.style.filter = '';
+    clone.style.colorScheme = '';
 
     // SVG Cleanup: Remove all class attributes and style tags (Clean Slate)
     const allElements = clone.querySelectorAll('*');
@@ -121,8 +121,8 @@ export function prepareSvgForExport(svgElement: SVGSVGElement, options: { backgr
     bgRect.setAttribute("height", String(height));
     bgRect.setAttribute("fill", finalBgColor);
 
-    // Word Compatibility: Explicit inline styles
-    bgRect.style.fill = finalBgColor;
+    // Word Compatibility: Explicit inline styles (Simplified)
+    // bgRect.style.fill = finalBgColor; // Not strictly needed if attribute is present and no classes
     bgRect.style.stroke = "none";
 
     // Word Compatibility: Set background on root (sometimes helps)
@@ -192,6 +192,13 @@ export async function exportToPng(svgElement: SVGSVGElement, options: { scale?: 
  * Helper to rasterize SVG to PNG Blob
  */
 export async function svgToPngBlob(svgElement: SVGSVGElement, width: number, height: number, scale: number, backgroundColor: string): Promise<Blob> {
+    // FORCE Light Mode styles for Canvas rendering (Fixes Dark Mode Inversion)
+    // We modify the cloned element directly before serialization for image source.
+    svgElement.style.setProperty('color-scheme', 'light', 'important');
+    svgElement.style.setProperty('filter', 'none', 'important');
+    // Ensure text fill is correct if it relied on inheritance
+    svgElement.style.fill = OFF_BLACK;
+
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(svgElement);
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -235,12 +242,20 @@ export async function svgToPngBlob(svgElement: SVGSVGElement, width: number, hei
  * Exports an SVG element to the system clipboard as SVG text.
  * Matches PNG behavior (Copy instead of Download).
  */
+
+
+/**
+ * Exports an SVG element to the system clipboard as SVG text.
+ * Matches PNG behavior (Copy instead of Download).
+ */
 export async function exportToSvg(svgElement: SVGSVGElement, options: { backgroundColor?: string, destination?: 'CLIPBOARD' | 'DOWNLOAD', filename?: string } = {}): Promise<void> {
     // Default filename empty
     const { backgroundColor = '#DCB35C', destination = 'CLIPBOARD', filename = '' } = options;
 
     // 1. Prepare SVG
     const clone = prepareSvgForExport(svgElement, { backgroundColor });
+
+
 
     // Dimension extraction
     const width = parseFloat(clone.getAttribute('width') || '0');
@@ -416,3 +431,4 @@ export async function writeToHandle(handle: any, blob: Blob) {
     await writable.write(blob);
     await writable.close();
 }
+export const getFileHandle = promptSaveFile;

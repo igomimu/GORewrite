@@ -1,7 +1,7 @@
 ﻿{
     "manifest_version": 3,
     "name": "GORewrite",
-    "version": "2.0.3",
+    "version": "2.0.5",
     "icons": {
         "16": "icons/icon16.png",
         "48": "icons/icon48.png",
@@ -16,8 +16,6 @@
         "default_path": "index.html"
     },
     "permissions": [
-        "clipboardWrite",
-        "sidePanel",
         "downloads"
     ]
 }

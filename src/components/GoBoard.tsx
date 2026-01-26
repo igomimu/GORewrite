@@ -1,4 +1,5 @@
 import { forwardRef, useMemo } from 'react';
+import { OFF_BLACK, OFF_WHITE } from '../constants';
 
 // Removed ViewRange reference - we use full board always now?
 // Actually App.tsx still uses viewRange state, but we are "abolishing X-Range Y-Range UI".
@@ -196,7 +197,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 key={`v-${i}`}
                 x1={pos} y1={start}
                 x2={pos} y2={end}
-                stroke="black"
+                stroke={OFF_BLACK}
                 strokeWidth={width}
                 strokeLinecap="square"
                 className="grid-line"
@@ -209,7 +210,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 key={`h-${i}`}
                 x1={start} y1={pos}
                 x2={end} y2={pos}
-                stroke="black"
+                stroke={OFF_BLACK}
                 strokeWidth={width}
                 strokeLinecap="square"
                 className="grid-line"
@@ -234,7 +235,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             // Top Labels
             coords.push(
                 <text
-                    key={`cx-${i}`} x={pos} y={MARGIN - 25} textAnchor="middle" fontSize={COORD_FONT_SIZE} fill="black" fontFamily="sans-serif" fontWeight="bold"
+                    key={`cx-${i}`} x={pos} y={MARGIN - 25} textAnchor="middle" fontSize={COORD_FONT_SIZE} fill={OFF_BLACK} fontFamily="sans-serif" fontWeight="bold"
                     style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}
                 >
                     {getLabel(i)}
@@ -243,7 +244,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             // Left Labels
             coords.push(
                 <text
-                    key={`cy-${i}`} x={MARGIN - 25} y={pos + 5} textAnchor="middle" fontSize={COORD_FONT_SIZE} fill="black" fontFamily="sans-serif" fontWeight="bold"
+                    key={`cy-${i}`} x={MARGIN - 25} y={pos + 5} textAnchor="middle" fontSize={COORD_FONT_SIZE} fill={OFF_BLACK} fontFamily="sans-serif" fontWeight="bold"
                     style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}
                 >
                     {boardSize - i + 1}
@@ -353,7 +354,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             const cy = MARGIN + (m.y - 1) * CELL_SIZE;
             const stone = boardState[m.y - 1]?.[m.x - 1];
             const isBlackStone = stone?.color === 'BLACK';
-            const baseColor = isBlackStone ? 'white' : 'black';
+            const baseColor = isBlackStone ? OFF_WHITE : OFF_BLACK;
 
             if (m.type === 'LABEL') {
                 markerElements.push(
@@ -455,7 +456,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 y={viewBoxData.y}
                 width={viewBoxData.w}
                 height={viewBoxData.h}
-                fill={isMonochrome ? 'white' : '#DCB35C'}
+                fill={isMonochrome ? OFF_WHITE : '#DCB35C'}
                 stroke="none"
                 style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
             />
@@ -470,7 +471,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                     cx={MARGIN + (sx - 1) * CELL_SIZE}
                     cy={MARGIN + (sy - 1) * CELL_SIZE}
                     r={STAR_POINT_RADIUS}
-                    fill="black"
+                    fill={OFF_BLACK}
                 // Removed crispEdges from stars for smoothness
                 />
             ))}
@@ -499,7 +500,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                             cx={cx} cy={cy}
                             r={STONE_RADIUS * 0.6} // Created slightly smaller
                             fill={isBlack ? "black" : "white"}
-                            stroke="black"
+                            stroke={OFF_BLACK}
                             strokeWidth={1}
                             opacity={0.5}
                         />
@@ -529,7 +530,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 // Dynamic Flow Layout Calculation
                 const boardDisplayWidth = (validMaxX - validMinX + 1) * CELL_SIZE;
 
-                const footerBg = isMonochrome ? 'white' : '#DCB35C';
+                const footerBg = isMonochrome ? OFF_WHITE : '#DCB35C';
 
                 // Pre-calculate positions using Flow Layout
                 const itemsWithPos = hiddenMoves.reduce((acc, ref, i) => {
@@ -580,8 +581,8 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                                 const stoneX = 20 + idx * 35;
                                 return (
                                     <g key={`l-${idx}`}>
-                                        <circle cx={stoneX} cy={0} r={RADIUS} fill={stone.color === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
-                                        <text x={stoneX} y={0} dy=".35em" textAnchor="middle" fill={stone.color === 'BLACK' ? 'white' : 'black'} fontSize={(stone.text && stone.text.length >= 3) ? CELL_SIZE * 0.45 : FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{stone.text}</text>
+                                        <circle cx={stoneX} cy={0} r={RADIUS} fill={stone.color === 'BLACK' ? OFF_BLACK : OFF_WHITE} stroke={OFF_BLACK} strokeWidth={1} />
+                                        <text x={stoneX} y={0} dy=".35em" textAnchor="middle" fill={stone.color === 'BLACK' ? OFF_WHITE : OFF_BLACK} fontSize={(stone.text && stone.text.length >= 3) ? CELL_SIZE * 0.45 : FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{stone.text}</text>
                                     </g>
                                 );
                             });
@@ -594,14 +595,14 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                                     {leftGroup}
 
                                     {/* Bracket Open */}
-                                    <text x={rightStartX} y={8} fontSize="20" fill="black" fontFamily="sans-serif">[</text>
+                                    <text x={rightStartX} y={8} fontSize="20" fill={OFF_BLACK} fontFamily="sans-serif">[</text>
 
                                     {/* Right Stone (Label) */}
-                                    <circle cx={rightStartX + 30} cy={0} r={RADIUS} fill={rColor === 'BLACK' ? 'black' : 'white'} stroke="black" strokeWidth={1} />
-                                    <text x={rightStartX + 30} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? 'white' : 'black'} fontSize={(item.right.text && item.right.text.length >= 3) ? CELL_SIZE * 0.45 : FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{item.right.text}</text>
+                                    <circle cx={rightStartX + 30} cy={0} r={RADIUS} fill={rColor === 'BLACK' ? OFF_BLACK : OFF_WHITE} stroke={OFF_BLACK} strokeWidth={1} />
+                                    <text x={rightStartX + 30} y={0} dy=".35em" textAnchor="middle" fill={rColor === 'BLACK' ? OFF_WHITE : OFF_BLACK} fontSize={(item.right.text && item.right.text.length >= 3) ? CELL_SIZE * 0.45 : FONT} fontFamily="Arial, sans-serif" fontWeight="bold" style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}>{item.right.text}</text>
 
                                     {/* Bracket Close */}
-                                    <text x={rightStartX + 60} y={8} fontSize="20" fill="black" fontFamily="sans-serif">]</text>
+                                    <text x={rightStartX + 60} y={8} fontSize="20" fill={OFF_BLACK} fontFamily="sans-serif">]</text>
                                 </g>
                             );
                         })}
