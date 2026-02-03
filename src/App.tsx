@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom'
 import GoBoard, { ViewRange, BoardState, StoneColor, Marker, Stone } from './components/GoBoard'
 import GameInfoModal from './components/GameInfoModal'
 import PrintSettingsModal, { PrintSettings } from './components/PrintSettingsModal'
+import AnalysisPanel from './components/AnalysisPanel'
 import { exportToPng, exportToSvg, exportToEmf, prepareSvgForExport, svgToPngBlob } from './utils/exportUtils'
 import { createGifFromImages } from './utils/gifExportUtils'
 import { checkCaptures } from './utils/gameLogic'
@@ -10,6 +11,8 @@ import { parseSGFTree, generateSGFTree, SgfTreeNode } from './utils/sgfUtils'
 import { generatePrintFigures } from './utils/printUtils'
 import { APP_VERSION, DEV_VERSION } from './constants'
 import { useTranslation, Language, languageNames } from './i18n'
+import { useKataGoAnalysis } from './hooks/useKataGoAnalysis'
+import { SuggestedMove, AnalysisResult } from './types/katago'
 
 // Chrome extension download API (type stub)
 declare const chrome: any;
@@ -165,7 +168,30 @@ function App() {
     const hoveredCellRef = useRef<{ x: number, y: number } | null>(null);
     const [showNextMove, setShowNextMove] = useState(false);
 
+    // AI Analysis State
+    const katagoAnalysis = useKataGoAnalysis();
+    const [showAnalysisPanel, setShowAnalysisPanel] = useState(false);
+    const [maxVisits, setMaxVisits] = useState(100);
+    const [showOwnership, setShowOwnership] = useState(false);
+    const [hoveredAnalysisMove, setHoveredAnalysisMove] = useState<SuggestedMove | null>(null);
+    const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
+    // Auto-analyze when position changes
+    useEffect(() => {
+        if (katagoAnalysis.isConnected && katagoAnalysis.autoAnalyze) {
+            katagoAnalysis.analyzePosition(rootNode, currentNodeId, boardSize, { maxVisits })
+                .then(result => {
+                    if (result) setAnalysisResult(result);
+                });
+        }
+    }, [currentNodeId, katagoAnalysis.isConnected, katagoAnalysis.autoAnalyze, maxVisits]);
+
+    const handleAnalyze = useCallback(() => {
+        katagoAnalysis.analyzePosition(rootNode, currentNodeId, boardSize, { maxVisits })
+            .then(result => {
+                if (result) setAnalysisResult(result);
+            });
+    }, [rootNode, currentNodeId, boardSize, maxVisits]);
 
     // Replaced commitState with Tree Logic
     const commitState = (newBoard: BoardState, newNextNumber: number, newActiveColor: StoneColor, newSize: number, newMarkers?: Marker[], move?: { x: number, y: number, color: StoneColor }) => {
@@ -2360,7 +2386,41 @@ function App() {
                             </button>
                         </div>
 
-                        {/* Group 5: System */}
+                        {/* Group 5: AI Analysis */}
+                        <div className="flex bg-purple-50 rounded-lg items-center px-0.5 py-0.5 border border-purple-100 gap-0.5">
+                            <button
+                                onClick={() => katagoAnalysis.isConnected ? katagoAnalysis.disconnect() : katagoAnalysis.connect()}
+                                className={`w-6 h-6 rounded-md flex items-center justify-center transition-all text-sm shadow-sm ${
+                                    katagoAnalysis.isConnected
+                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                        : 'bg-white text-gray-400 hover:bg-gray-50'
+                                }`}
+                                title={katagoAnalysis.isConnected ? 'KataGoから切断' : 'KataGoに接続'}
+                            >
+                                {katagoAnalysis.isConnected ? '🔗' : '🔌'}
+                            </button>
+                            <button
+                                onClick={() => setShowAnalysisPanel(!showAnalysisPanel)}
+                                className={`w-6 h-6 rounded-md flex items-center justify-center transition-all text-sm shadow-sm ${
+                                    showAnalysisPanel
+                                        ? 'bg-purple-200 text-purple-700'
+                                        : 'bg-white text-purple-600 hover:bg-purple-50'
+                                }`}
+                                title="検討パネル"
+                            >
+                                🤖
+                            </button>
+                            <button
+                                onClick={handleAnalyze}
+                                disabled={!katagoAnalysis.isConnected || katagoAnalysis.isAnalyzing}
+                                className="w-6 h-6 rounded-md bg-white text-purple-600 hover:bg-purple-50 flex items-center justify-center transition-all text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="局面を分析"
+                            >
+                                {katagoAnalysis.isAnalyzing ? '⏳' : '🔍'}
+                            </button>
+                        </div>
+
+                        {/* Group 6: System */}
                         <div className="flex items-center gap-1 pl-1">
                             {/* Language Switcher */}
                             <button
@@ -2530,6 +2590,16 @@ function App() {
                         markers={history[currentMoveIndex]?.markers || []}
                         nextMoves={(branchCandidates.length > 1 || showNextMove) ? branchCandidates : []}
                         onNextMoveClick={handleBranchClick}
+                        analysisOverlay={analysisResult ? {
+                            suggestedMoves: analysisResult.suggestedMoves,
+                            ownership: analysisResult.ownership?.ownership,
+                            showOwnership: showOwnership,
+                            hoveredMove: hoveredAnalysisMove
+                        } : undefined}
+                        onAnalysisMoveClick={(move) => {
+                            // Play the suggested move
+                            handleInteraction(move.x, move.y);
+                        }}
                     />
 
                     {/* Float Controls: Zoom / Reset */}
@@ -2566,6 +2636,29 @@ function App() {
                         )}
                     </div>
                 </div>
+
+                {/* AI Analysis Panel */}
+                {showAnalysisPanel && (
+                    <div className="w-full max-w-md">
+                        <AnalysisPanel
+                            isConnected={katagoAnalysis.isConnected}
+                            isAnalyzing={katagoAnalysis.isAnalyzing}
+                            result={analysisResult}
+                            error={katagoAnalysis.error}
+                            autoAnalyze={katagoAnalysis.autoAnalyze}
+                            onConnect={() => katagoAnalysis.connect()}
+                            onDisconnect={() => katagoAnalysis.disconnect()}
+                            onAnalyze={handleAnalyze}
+                            onAutoAnalyzeChange={(enabled) => katagoAnalysis.setAutoAnalyze(enabled)}
+                            onMoveClick={(move) => handleInteraction(move.x, move.y)}
+                            onMoveHover={(move) => setHoveredAnalysisMove(move)}
+                            onShowOwnership={(show) => setShowOwnership(show)}
+                            showOwnership={showOwnership}
+                            maxVisits={maxVisits}
+                            onMaxVisitsChange={(visits) => setMaxVisits(visits)}
+                        />
+                    </div>
+                )}
 
                 {/* Controls */}
                 <div className="bg-white p-4 rounded shadow w-full space-y-4">

@@ -1,4 +1,5 @@
 import { forwardRef, useMemo } from 'react';
+import { SuggestedMove } from '../types/katago';
 
 // Removed ViewRange reference - we use full board always now?
 // Actually App.tsx still uses viewRange state, but we are "abolishing X-Range Y-Range UI".
@@ -65,6 +66,15 @@ export interface GoBoardProps {
     // Branching Support
     nextMoves?: { x: number, y: number, color: StoneColor, id: string }[];
     onNextMoveClick?: (id: string) => void;
+
+    // AI Analysis Overlay
+    analysisOverlay?: {
+        suggestedMoves?: SuggestedMove[];
+        ownership?: number[][];  // -1 (white) to +1 (black) per intersection
+        showOwnership?: boolean;
+        hoveredMove?: SuggestedMove | null;  // 変化図表示用
+    };
+    onAnalysisMoveClick?: (move: SuggestedMove) => void;
 }
 
 const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
@@ -90,7 +100,9 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     markers = [],
     readOnly = false,
     nextMoves = [],
-    onNextMoveClick
+    onNextMoveClick,
+    analysisOverlay,
+    onAnalysisMoveClick
 }, ref) => {
     const CELL_SIZE = 40;
     const MARGIN = 40;
@@ -512,6 +524,127 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
 
             {selectionRect}
             {markerElements}
+
+            {/* AI Analysis Overlay: Ownership Heatmap */}
+            {analysisOverlay?.showOwnership && analysisOverlay.ownership && (
+                <g id="ownership-overlay" data-export-ignore="true">
+                    {analysisOverlay.ownership.map((row, y) =>
+                        row.map((value, x) => {
+                            if (Math.abs(value) < 0.1) return null; // Skip neutral
+                            const cx = MARGIN + x * CELL_SIZE;
+                            const cy = MARGIN + y * CELL_SIZE;
+                            const stone = boardState[y]?.[x];
+                            if (stone) return null; // Skip if stone exists
+
+                            const opacity = Math.min(Math.abs(value) * 0.6, 0.5);
+                            const color = value > 0 ? 'rgba(0, 100, 255, ' + opacity + ')' : 'rgba(255, 100, 0, ' + opacity + ')';
+
+                            return (
+                                <rect
+                                    key={`own-${x}-${y}`}
+                                    x={cx - CELL_SIZE / 2}
+                                    y={cy - CELL_SIZE / 2}
+                                    width={CELL_SIZE}
+                                    height={CELL_SIZE}
+                                    fill={color}
+                                    pointerEvents="none"
+                                />
+                            );
+                        })
+                    )}
+                </g>
+            )}
+
+            {/* AI Analysis Overlay: Suggested Moves */}
+            {analysisOverlay?.suggestedMoves && !readOnly && (
+                <g id="analysis-overlay" data-export-ignore="true">
+                    {analysisOverlay.suggestedMoves.slice(0, 5).map((move) => {
+                        const cx = MARGIN + (move.x - 1) * CELL_SIZE;
+                        const cy = MARGIN + (move.y - 1) * CELL_SIZE;
+                        const stone = boardState[move.y - 1]?.[move.x - 1];
+                        if (stone) return null; // Skip if stone exists
+
+                        // Color based on rank
+                        let bgColor = '#22c55e'; // green for rank 1
+                        let textColor = '#ffffff';
+                        if (move.rank === 2) {
+                            bgColor = '#3b82f6'; // blue
+                        } else if (move.rank >= 3) {
+                            bgColor = '#a855f7'; // purple
+                        }
+
+                        return (
+                            <g
+                                key={`suggest-${move.x}-${move.y}`}
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onAnalysisMoveClick?.(move);
+                                }}
+                            >
+                                <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={STONE_RADIUS * 0.7}
+                                    fill={bgColor}
+                                    opacity={0.8}
+                                />
+                                <text
+                                    x={cx}
+                                    y={cy}
+                                    dy=".35em"
+                                    textAnchor="middle"
+                                    fill={textColor}
+                                    fontSize={FONT_SIZE * 0.8}
+                                    fontFamily="Arial, sans-serif"
+                                    fontWeight="bold"
+                                    pointerEvents="none"
+                                >
+                                    {move.rank}
+                                </text>
+                            </g>
+                        );
+                    })}
+                </g>
+            )}
+
+            {/* AI Analysis Overlay: Hovered Move PV (Variation) */}
+            {analysisOverlay?.hoveredMove?.pv && (
+                <g id="pv-overlay" data-export-ignore="true">
+                    {analysisOverlay.hoveredMove.pv.slice(0, 5).map((pvMove, idx) => {
+                        const cx = MARGIN + (pvMove.x - 1) * CELL_SIZE;
+                        const cy = MARGIN + (pvMove.y - 1) * CELL_SIZE;
+                        const isBlack = pvMove.color === 'B';
+
+                        return (
+                            <g key={`pv-${idx}`} pointerEvents="none">
+                                <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={STONE_RADIUS * 0.5}
+                                    fill={isBlack ? '#000000' : '#FFFFFF'}
+                                    stroke={isBlack ? '#333333' : '#000000'}
+                                    strokeWidth={1}
+                                    opacity={0.7}
+                                />
+                                <text
+                                    x={cx}
+                                    y={cy}
+                                    dy=".35em"
+                                    textAnchor="middle"
+                                    fill={isBlack ? '#FFFFFF' : '#000000'}
+                                    fontSize={FONT_SIZE * 0.6}
+                                    fontFamily="Arial, sans-serif"
+                                    fontWeight="bold"
+                                    opacity={0.9}
+                                >
+                                    {idx + 1}
+                                </text>
+                            </g>
+                        );
+                    })}
+                </g>
+            )}
 
             {/* Footer Text for Hidden Moves */}
             {hiddenMoves.length > 0 && (() => {
