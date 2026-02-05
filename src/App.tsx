@@ -2411,36 +2411,48 @@ function App() {
                                         <div className="text-xs text-gray-500">{t('help.clickDesc')}</div>
                                     </div>
                                 </div>
-                                <div className="w-6 text-center text-xl">⚙️</div>
-                                <div>
-                                    <div className="font-bold">{t('help.wheel')}</div>
-                                    <div className="text-xs text-gray-500">{t('help.wheelDesc')}</div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xl">✋</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.drag')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.dragDesc')}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xl">⚙️</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.wheel')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.wheelDesc')}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xs font-mono border rounded bg-gray-100">Ctrl+F</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.copy')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.copyDesc')}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xs font-mono border rounded bg-gray-100">Ctrl+V</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.sgfPaste')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.sgfPasteDesc')}</div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="w-6 text-center text-xl">⚙️</div>
-                                <div>
-                                    <div className="font-bold">{t('help.wheel')}</div>
-                                    <div className="text-xs text-gray-500">{t('help.wheelDesc')}</div>
+                            <div className="mt-4 pt-3 border-t border-gray-200">
+                                <div className="text-xs text-gray-500 text-center">
+                                    <div>{t('about.author')}</div>
+                                    <div className="flex justify-center gap-3 mt-1">
+                                        <a href="https://mimurago.jp" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">🌐 {t('about.blog')}</a>
+                                        <a href="https://www.youtube.com/@mimurago" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">📺 {t('about.youtube')}</a>
+                                        <a href="https://ichikawakids.com" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">🏠 {t('about.dojo')}</a>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="w-6 text-center text-xs font-mono border rounded bg-gray-100">Ctrl+F</div>
-                                <div>
-                                    <div className="font-bold">{t('help.copy')}</div>
-                                    <div className="text-xs text-gray-500">{t('help.copyDesc')}</div>
-                                </div>
+                            <div className="mt-3 text-center text-xs text-gray-400">
+                                GORewrite {displayVersion}
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="w-6 text-center text-xs font-mono border rounded bg-gray-100">Ctrl+V</div>
-                                <div>
-                                    <div className="font-bold">{t('help.sgfPaste')}</div>
-                                    <div className="text-xs text-gray-500">{t('help.sgfPasteDesc')}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="mt-6 text-center text-xs text-gray-400">
-                            GORewrite {displayVersion}
                         </div>
                     </div>
                 )}

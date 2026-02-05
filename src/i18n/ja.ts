@@ -77,7 +77,7 @@ export const ja = {
     // Help Modal
     'help.title': 'ショートカット & ヘルプ',
     'help.clickRightClick': 'クリック / 右クリック',
-    'help.clickDesc': '石を置く / 削除',
+    'help.clickDesc': 'クリックは黒、右クリックは白、石をクリックで削除',
     'help.drag': 'ドラッグ',
     'help.dragDesc': '範囲選択 (切り抜き) / 石の移動',
     'help.wheel': 'ホイール',
@@ -86,6 +86,12 @@ export const ja = {
     'help.copyDesc': '画像をクリップボードに保存',
     'help.sgfPaste': 'SGF貼り付け',
     'help.sgfPasteDesc': 'クリップボードから棋譜を読み込み',
+
+    // About
+    'about.author': '制作: 三村智保 九段',
+    'about.blog': '三村囲碁JP',
+    'about.youtube': 'YouTube',
+    'about.dojo': '市川こども囲碁道場',
 
     // === GameInfoModal.tsx ===
     'gameInfo.title': '対局情報',

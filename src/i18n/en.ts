@@ -77,7 +77,7 @@ export const en: Record<TranslationKey, string> = {
     // Help Modal
     'help.title': 'Shortcuts & Help',
     'help.clickRightClick': 'Click / Right-Click',
-    'help.clickDesc': 'Place / Remove stone',
+    'help.clickDesc': 'Click: black, Right-click: white, Click stone: remove',
     'help.drag': 'Drag',
     'help.dragDesc': 'Selection (Crop) / Move stone',
     'help.wheel': 'Wheel',
@@ -86,6 +86,12 @@ export const en: Record<TranslationKey, string> = {
     'help.copyDesc': 'Copy image to clipboard',
     'help.sgfPaste': 'Paste SGF',
     'help.sgfPasteDesc': 'Load game record from clipboard',
+
+    // About
+    'about.author': 'Created by Tomoyasu Mimura, 9-dan',
+    'about.blog': 'Mimura Go JP',
+    'about.youtube': 'YouTube',
+    'about.dojo': 'Ichikawa Kids Go Dojo',
 
     // === GameInfoModal.tsx ===
     'gameInfo.title': 'Game Info',

@@ -77,7 +77,7 @@ export const zh: Record<TranslationKey, string> = {
     // Help Modal
     'help.title': '快捷键 & 帮助',
     'help.clickRightClick': '点击 / 右键点击',
-    'help.clickDesc': '放置 / 删除棋子',
+    'help.clickDesc': '点击放黑子、右键放白子、点击棋子删除',
     'help.drag': '拖动',
     'help.dragDesc': '选区 (裁剪) / 移动棋子',
     'help.wheel': '滚轮',
@@ -86,6 +86,12 @@ export const zh: Record<TranslationKey, string> = {
     'help.copyDesc': '复制图像到剪贴板',
     'help.sgfPaste': '粘贴SGF',
     'help.sgfPasteDesc': '从剪贴板加载棋谱',
+
+    // About
+    'about.author': '制作: 三村智保 九段',
+    'about.blog': '三村围棋JP',
+    'about.youtube': 'YouTube',
+    'about.dojo': '市川儿童围棋道场',
 
     // === GameInfoModal.tsx ===
     'gameInfo.title': '棋局信息',
