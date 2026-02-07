@@ -72,7 +72,60 @@ export const ja = {
     'ui.speedFast': '高速',
     'ui.speedMax': '最速',
 
-    // 譜分け関連
+    // Button Labels
+    'btn.new': '新規',
+    'btn.open': '開く',
+    'btn.save': '保存',
+    'btn.saveAs': '別名保存',
+    'btn.paste': '貼付',
+    'btn.info': '情報',
+    'btn.print': '印刷',
+    'btn.captured': '取石',
+    'btn.nextMove': '次の手',
+    'btn.numbers': '番号',
+    'btn.pass': 'パス',
+    'btn.copy': 'コピー',
+    'btn.savePng': 'PNG保存',
+    'btn.gif': 'GIF',
+    'btn.format': '形式',
+
+    // UI Labels (replacing hardcoded English)
+    'ui.coords': '座標',
+    'ui.boardSize': '盤サイズ',
+    'ui.startNumber': '開始番号',
+    'ui.copy': 'コピー',
+    'ui.zoom': '拡大',
+    'ui.reset': '戻す',
+    'ui.autoPlayStart': '自動再生',
+    'ui.autoPlayStop': '停止',
+
+    // Toast / Confirm
+    'alert.sgfOnly': 'SGFファイルのみ対応 (.sgf)',
+    'alert.gifFailed': 'GIF生成に失敗しました',
+    'alert.saveError': '保存エラー: ダウンロード権限を確認してください',
+    'confirm.clear': '盤面をクリアしますか？入力内容は失われます。',
+    'confirm.clearTitle': '盤面クリア',
+    'confirm.clearDesc': '現在の盤面と全ての入力内容が削除されます。この操作は取り消せません。',
+    'btn.cancel': 'キャンセル',
+    'btn.clearConfirm': 'クリア',
+    'alert.openError': 'ファイルを開けませんでした',
+    'alert.clipboardError': 'クリップボードへのコピーに失敗しました',
+    'alert.exportError': '画像の書き出しに失敗しました',
+    'alert.printError': '印刷ダイアログの表示に失敗しました',
+
+    // Hint lines (footer)
+    'hint.line1': '左クリック: 配置 / 右クリック: 削除',
+    'hint.line2': 'ダブルクリック: 色変更',
+    'hint.line3': 'ホイール: 手の進む/戻る',
+    'hint.line4': 'Ctrl+V: SGF貼り付け',
+
+    // Help Modal (new items)
+    'help.modeSwitch': 'モード切替',
+    'help.modeSwitchDesc': '●/○: 石を自由に配置 / ①: 手順を記録',
+    'help.fileOps': 'ファイル操作',
+    'help.fileOpsDesc': '📂で読み込み / 💾で上書き保存 / 📄で名前を付けて保存',
+    'help.printExport': '印刷・画像出力',
+    'help.printExportDesc': '🖨️で印刷 / 📷で画像コピー / ⬇️でPNG保存',
 
     // Help Modal
     'help.title': 'ショートカット & ヘルプ',
@@ -86,6 +139,18 @@ export const ja = {
     'help.copyDesc': '画像をクリップボードに保存',
     'help.sgfPaste': 'SGF貼り付け',
     'help.sgfPasteDesc': 'クリップボードから棋譜を読み込み',
+    'help.shortcuts': 'キーボードショートカット',
+    'help.shortcutNew': '新規/クリア',
+    'help.shortcutOpen': 'ファイルを開く',
+    'help.shortcutSave': '名前を付けて保存',
+    'help.shortcutCopySgf': 'SGFをコピー',
+    'help.shortcutCopyImg': '画像をコピー',
+    'help.shortcutPaste': 'SGF貼り付け',
+    'help.shortcutPrint': '印刷',
+    'help.shortcutUndo': '削除 (Undo)',
+    'help.shortcutRedo': '復元 (Redo)',
+    'help.shortcutNav': '手の戻る/進む',
+    'help.shortcutDelete': '最後の手を削除',
 
     // About
     'about.author': '制作: 三村智保 九段',

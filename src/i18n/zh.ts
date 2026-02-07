@@ -74,6 +74,61 @@ export const zh: Record<TranslationKey, string> = {
     'ui.speedFast': '高速',
     'ui.speedMax': '最快',
 
+    // Button Labels
+    'btn.new': '新建',
+    'btn.open': '打开',
+    'btn.save': '保存',
+    'btn.saveAs': '另存',
+    'btn.paste': '粘贴',
+    'btn.info': '信息',
+    'btn.print': '打印',
+    'btn.captured': '取子',
+    'btn.nextMove': '下一手',
+    'btn.numbers': '编号',
+    'btn.pass': '虚手',
+    'btn.copy': '复制',
+    'btn.savePng': 'PNG',
+    'btn.gif': 'GIF',
+    'btn.format': '格式',
+
+    // UI Labels
+    'ui.coords': '坐标',
+    'ui.boardSize': '棋盘',
+    'ui.startNumber': '起始号',
+    'ui.copy': '复制',
+    'ui.zoom': '放大',
+    'ui.reset': '重置',
+    'ui.autoPlayStart': '自动播放',
+    'ui.autoPlayStop': '停止',
+
+    // Toast / Confirm
+    'alert.sgfOnly': '仅支持SGF文件 (.sgf)',
+    'alert.gifFailed': 'GIF生成失败',
+    'alert.saveError': '保存错误: 请检查下载权限',
+    'confirm.clear': '清除棋盘？所有输入将丢失。',
+    'confirm.clearTitle': '清除棋盘',
+    'confirm.clearDesc': '棋盘上的所有棋子和输入内容将被删除。此操作无法撤销。',
+    'btn.cancel': '取消',
+    'btn.clearConfirm': '清除',
+    'alert.openError': '无法打开文件',
+    'alert.clipboardError': '复制到剪贴板失败',
+    'alert.exportError': '图片导出失败',
+    'alert.printError': '无法打开打印对话框',
+
+    // Hint lines
+    'hint.line1': '左键: 放置 / 右键: 删除',
+    'hint.line2': '双击: 切换颜色',
+    'hint.line3': '滚轮: 前进/后退',
+    'hint.line4': 'Ctrl+V: 粘贴SGF',
+
+    // Help Modal (new items)
+    'help.modeSwitch': '模式切换',
+    'help.modeSwitchDesc': '●/○: 自由布局 / ①: 记录手顺',
+    'help.fileOps': '文件操作',
+    'help.fileOpsDesc': '📂打开 / 💾覆盖保存 / 📄另存为',
+    'help.printExport': '打印与导出',
+    'help.printExportDesc': '🖨️打印 / 📷复制图像 / ⬇️保存PNG',
+
     // Help Modal
     'help.title': '快捷键 & 帮助',
     'help.clickRightClick': '点击 / 右键点击',
@@ -86,6 +141,18 @@ export const zh: Record<TranslationKey, string> = {
     'help.copyDesc': '复制图像到剪贴板',
     'help.sgfPaste': '粘贴SGF',
     'help.sgfPasteDesc': '从剪贴板加载棋谱',
+    'help.shortcuts': '键盘快捷键',
+    'help.shortcutNew': '新建/清除',
+    'help.shortcutOpen': '打开文件',
+    'help.shortcutSave': '另存为',
+    'help.shortcutCopySgf': '复制SGF',
+    'help.shortcutCopyImg': '复制图片',
+    'help.shortcutPaste': '粘贴SGF',
+    'help.shortcutPrint': '打印',
+    'help.shortcutUndo': '删除 (撤销)',
+    'help.shortcutRedo': '恢复 (重做)',
+    'help.shortcutNav': '上一手/下一手',
+    'help.shortcutDelete': '删除最后一手',
 
     // About
     'about.author': '制作: 三村智保 九段',
