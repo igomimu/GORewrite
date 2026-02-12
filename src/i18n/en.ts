@@ -24,6 +24,8 @@ export const en: Record<TranslationKey, string> = {
     'tooltip.showCaptured': 'Show Captured Stones in Export: {status}',
     'tooltip.showNumbers': 'Show Move Numbers: {status}',
     'tooltip.pass': 'Pass',
+    'tooltip.showNextMove': 'Show Next Move Candidates: {status}',
+    'tooltip.playbackSpeed': 'Playback Speed',
 
     // Tooltips - Export
     'tooltip.copyAs': 'Copy as {format} (Click to Copy)',
@@ -67,11 +69,70 @@ export const en: Record<TranslationKey, string> = {
     'ui.monochrome': 'Monochrome',
     'ui.branch': 'Branch',
     'ui.exportingGif': 'Creating GIF...',
+    'ui.speedSlow': 'Slow',
+    'ui.speedNormal': 'Normal',
+    'ui.speedFast': 'Fast',
+    'ui.speedMax': 'Max',
+
+    // Button Labels
+    'btn.new': 'New',
+    'btn.open': 'Open',
+    'btn.save': 'Save',
+    'btn.saveAs': 'Save As',
+    'btn.paste': 'Paste',
+    'btn.info': 'Info',
+    'btn.print': 'Print',
+    'btn.captured': 'Ghost',
+    'btn.nextMove': 'Next',
+    'btn.numbers': 'Num',
+    'btn.pass': 'Pass',
+    'btn.copy': 'Copy',
+    'btn.savePng': 'PNG',
+    'btn.gif': 'GIF',
+    'btn.format': 'Fmt',
+
+    // UI Labels
+    'ui.coords': 'Coords',
+    'ui.boardSize': 'Size',
+    'ui.startNumber': 'Start #',
+    'ui.copy': 'Copy',
+    'ui.zoom': 'Zoom',
+    'ui.reset': 'Reset',
+    'ui.autoPlayStart': 'Auto Play',
+    'ui.autoPlayStop': 'Stop',
+
+    // Toast / Confirm
+    'alert.sgfOnly': 'SGF files only (.sgf)',
+    'alert.gifFailed': 'GIF export failed',
+    'alert.saveError': 'Save error: Check download permissions',
+    'confirm.clear': 'Clear the board? All input will be lost.',
+    'confirm.clearTitle': 'Clear Board',
+    'confirm.clearDesc': 'All stones and input on the board will be deleted. This action cannot be undone.',
+    'btn.cancel': 'Cancel',
+    'btn.clearConfirm': 'Clear',
+    'alert.openError': 'Failed to open file',
+    'alert.clipboardError': 'Failed to copy to clipboard',
+    'alert.exportError': 'Failed to export image',
+    'alert.printError': 'Failed to open print dialog',
+
+    // Hint lines
+    'hint.line1': 'Left click: Place / Right click: Delete',
+    'hint.line2': 'Double click: Change color',
+    'hint.line3': 'Wheel: Navigate moves',
+    'hint.line4': 'Ctrl+V: Paste SGF',
+
+    // Help Modal (new items)
+    'help.modeSwitch': 'Mode Switch',
+    'help.modeSwitchDesc': '●/○: Free placement / ①: Record moves',
+    'help.fileOps': 'File Operations',
+    'help.fileOpsDesc': '📂 Open / 💾 Overwrite save / 📄 Save as',
+    'help.printExport': 'Print & Export',
+    'help.printExportDesc': '🖨️ Print / 📷 Copy image / ⬇️ Save PNG',
 
     // Help Modal
     'help.title': 'Shortcuts & Help',
     'help.clickRightClick': 'Click / Right-Click',
-    'help.clickDesc': 'Place / Remove stone',
+    'help.clickDesc': 'Click: black, Right-click: white, Click stone: remove',
     'help.drag': 'Drag',
     'help.dragDesc': 'Selection (Crop) / Move stone',
     'help.wheel': 'Wheel',
@@ -80,6 +141,24 @@ export const en: Record<TranslationKey, string> = {
     'help.copyDesc': 'Copy image to clipboard',
     'help.sgfPaste': 'Paste SGF',
     'help.sgfPasteDesc': 'Load game record from clipboard',
+    'help.shortcuts': 'Keyboard Shortcuts',
+    'help.shortcutNew': 'New / Clear',
+    'help.shortcutOpen': 'Open File',
+    'help.shortcutSave': 'Save As',
+    'help.shortcutCopySgf': 'Copy SGF',
+    'help.shortcutCopyImg': 'Copy Image',
+    'help.shortcutPaste': 'Paste SGF',
+    'help.shortcutPrint': 'Print',
+    'help.shortcutUndo': 'Delete (Undo)',
+    'help.shortcutRedo': 'Restore (Redo)',
+    'help.shortcutNav': 'Previous / Next Move',
+    'help.shortcutDelete': 'Delete Last Move',
+
+    // About
+    'about.author': 'Created by Tomoyasu Mimura, 9-dan',
+    'about.blog': 'Mimura Go JP',
+    'about.youtube': 'YouTube',
+    'about.dojo': 'Ichikawa Kids Go Dojo',
 
     // === GameInfoModal.tsx ===
     'gameInfo.title': 'Game Info',

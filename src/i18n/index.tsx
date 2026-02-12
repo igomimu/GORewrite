@@ -45,10 +45,15 @@ interface LanguageProviderProps {
 }
 
 export function LanguageProvider({ children }: LanguageProviderProps) {
-    const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+    const [language, setLanguageState] = useState<Language>(() => {
+        const lang = getInitialLanguage();
+        document.documentElement.lang = lang;
+        return lang;
+    });
 
     const setLanguage = useCallback((lang: Language) => {
         setLanguageState(lang);
+        document.documentElement.lang = lang;
         try {
             localStorage.setItem(STORAGE_KEY, lang);
         } catch (e) {

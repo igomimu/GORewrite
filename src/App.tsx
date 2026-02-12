@@ -3,8 +3,8 @@ import { flushSync } from 'react-dom'
 import GoBoard, { ViewRange, BoardState, StoneColor, Marker, Stone } from './components/GoBoard'
 import GameInfoModal from './components/GameInfoModal'
 import PrintSettingsModal, { PrintSettings } from './components/PrintSettingsModal'
-import { exportToSvg, exportToPng, getFileHandle, writeToHandle, saveFile, svgToPngBlob } from './utils/exportUtils';
-import { prepareSvgForExport } from './utils/exportUtils';
+import GlobalTooltip from './components/Tooltip'
+import { exportToPng, exportToSvg, exportToEmf, prepareSvgForExport, svgToPngBlob, saveFile, promptSaveFile, writeToHandle } from './utils/exportUtils'
 import { createGifFromImages } from './utils/gifExportUtils'
 import { checkCaptures } from './utils/gameLogic'
 import { parseSGFTree, generateSGFTree, SgfTreeNode } from './utils/sgfUtils'
@@ -16,13 +16,13 @@ import { useTranslation, Language, languageNames } from './i18n'
 declare const chrome: any;
 
 // Notify user where the downloads API saved the file (best-effort)
-const notifyDownloadLocation = (downloadId: number) => {
+const notifyDownloadLocation = (downloadId: number, onNotify?: (path: string) => void) => {
     try {
         if (chrome?.downloads?.search) {
             chrome.downloads.search({ id: downloadId }, (results: any[]) => {
                 const path = results?.[0]?.filename;
-                if (path) {
-                    alert(`保存しました: ${path}`);
+                if (path && onNotify) {
+                    onNotify(path);
                 }
             });
         }
@@ -44,7 +44,7 @@ export interface HistoryState {
     markers?: Marker[];
 }
 
-import { createNode, getPath, addMove, GameNode, recalculateBoards } from './utils/treeUtilsV2'
+import { createNode, getPath, addMove, GameNode, recalculateBoards, getMainPath } from './utils/treeUtilsV2'
 
 function App() {
     const { t, language, setLanguage } = useTranslation();
@@ -100,15 +100,29 @@ function App() {
     const [isMonochrome, setIsMonochrome] = useState(() => {
         try { return localStorage.getItem('gorw_is_monochrome') === 'true'; } catch { return false; }
     });
-    const [exportMode, setExportMode] = useState<'SVG' | 'PNG'>(() => {
-        try { const saved = localStorage.getItem('gorw_export_mode'); return (saved === 'SVG' || saved === 'PNG') ? saved : 'SVG'; } catch { return 'SVG'; }
+    const [exportMode, setExportMode] = useState<'SVG' | 'PNG' | 'EMF'>(() => {
+        try { const saved = localStorage.getItem('gorw_export_mode'); return (saved === 'SVG' || saved === 'PNG' || saved === 'EMF') ? (saved as any) : 'SVG'; } catch { return 'SVG'; }
     });
 
     const [showCapturedInExport, setShowCapturedInExport] = useState(false);
-    const [isExportingGif, setIsExportingGif] = useState(false);
-    const [gifProgress, setGifProgress] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackSpeed, setPlaybackSpeed] = useState(800); // ms per move (Default 0.8s)
+
+    const [isFigureMode, setIsFigureMode] = useState(false); // Internal State for Export Auto-Switch
+    const [isGifExporting, setIsGifExporting] = useState(false);
+    const [gifProgress, setGifProgress] = useState(0);
+
+    // Clear confirm modal state
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+    // Toast notification state
+    const [toast, setToast] = useState<{message: string, type: 'success'|'error'|'info'} | null>(null);
+    const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const showToast = useCallback((message: string, type: 'success'|'error'|'info' = 'info') => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        setToast({ message, type });
+        toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+    }, []);
 
     // Auto-Play Effect
     useEffect(() => {
@@ -145,6 +159,16 @@ function App() {
     }, []);
 
 
+    // Show help on first visit
+    useEffect(() => {
+        try {
+            if (!localStorage.getItem('gorw_first_visit')) {
+                setShowHelp(true);
+                localStorage.setItem('gorw_first_visit', 'true');
+            }
+        } catch { /* ignore */ }
+    }, []);
+
     useEffect(() => { localStorage.setItem('gorw_is_monochrome', String(isMonochrome)); }, [isMonochrome]);
 
     const [saveFileHandle, setSaveFileHandle] = useState<any>(null);
@@ -162,13 +186,9 @@ function App() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const dragStartRef = useRef<{ x: number, y: number } | null>(null);
     const hoveredCellRef = useRef<{ x: number, y: number } | null>(null);
+    const [showNextMove, setShowNextMove] = useState(false);
 
-    // GIF Export Refs
-    const gifTargetNodesRef = useRef<GameNode[]>([]);
-    const gifFramesRef = useRef<string[]>([]);
-    const originalNodeIdRef = useRef<string>('');
-    const gifFileHandleRef = useRef<any>(null);
-    const [gifExportIndex, setGifExportIndex] = useState<number>(-1);
+
 
     // Replaced commitState with Tree Logic
     const commitState = (newBoard: BoardState, newNextNumber: number, newActiveColor: StoneColor, newSize: number, newMarkers?: Marker[], move?: { x: number, y: number, color: StoneColor }) => {
@@ -918,54 +938,7 @@ function App() {
 
 
 
-    // Print Job Initialization
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('print_job') === 'true') {
-            setIsPrintJob(true);
-            const sgf = localStorage.getItem('gorw_temp_print_sgf');
-            const settingsStr = localStorage.getItem('gorw_temp_print_settings');
-
-            if (sgf && settingsStr) {
-                if (sgf.length > 20) {
-                    try {
-                        loadSGF(sgf);
-                        const savedIndex = localStorage.getItem('gorw_temp_print_index');
-                        if (savedIndex !== null) {
-                            const idx = parseInt(savedIndex, 10);
-                            let node = rootNode;
-                            for (let i = 0; i < idx; i++) {
-                                if (node.children.length > 0) node = node.children[0];
-                            }
-                            setCurrentNodeId(node.id);
-                        }
-                    } catch (e) {
-                        alert("Failed to load SGF data: " + e);
-                    }
-                }
-                setPrintSettings(JSON.parse(settingsStr));
-
-                // Set title
-                document.title = "Print Preview - Snap Goban";
-
-                const triggerPrint = () => {
-                    try {
-                        window.focus();
-                        window.print();
-                    } catch (e) {
-                        console.warn("Auto-print failed", e);
-                    }
-                };
-
-                // Auto-print with delay to ensure rendering
-                if (document.readyState === 'complete') {
-                    setTimeout(triggerPrint, 800);
-                } else {
-                    window.addEventListener('load', () => setTimeout(triggerPrint, 800), { once: true });
-                }
-            }
-        }
-    }, []);
+    // Print Job Initialization removed (Moved to handlePrintRequest direct flow)
 
     const loadSGF = (content: string) => {
         const { board: initialBoard, size, metadata, root: sgfRoot } = parseSGFTree(content);
@@ -1253,11 +1226,12 @@ function App() {
 
 
 
-    // @ts-ignore
-    const performExport = useCallback(async (bounds: { minX: number, maxX: number, minY: number, maxY: number }, restoredStones: { x: number, y: number, color: StoneColor, text: string }[] = [], options: { isSvg: boolean, destination?: 'CLIPBOARD' | 'DOWNLOAD', filename?: string }) => {
+
+    const performExport = useCallback(async (bounds: { minX: number, maxX: number, minY: number, maxY: number }, restoredStones: { x: number, y: number, color: StoneColor, text: string }[] = [], options: { mode: 'SVG' | 'PNG' | 'EMF', destination?: 'CLIPBOARD' | 'DOWNLOAD', filename?: string }) => {
         if (!svgRef.current) return;
 
-        const { isSvg, destination = 'CLIPBOARD', filename } = options;
+        const { mode, destination = 'CLIPBOARD', filename } = options;
+        const stonesToDraw = restoredStones;
         const CELL_SIZE = 40;
         const MARGIN = 40;
         const PADDING = 20;
@@ -1299,8 +1273,8 @@ function App() {
                 circle.setAttribute('cx', cx.toString());
                 circle.setAttribute('cy', cy.toString());
                 circle.setAttribute('r', '18.4');
-                circle.setAttribute('fill', stone.color === 'BLACK' ? '#000001' : '#FEFEFE');
-                circle.setAttribute('stroke', '#000001');
+                circle.setAttribute('fill', stone.color === 'BLACK' ? '#000000' : '#FFFFFF');
+                circle.setAttribute('stroke', '#000000');
                 circle.setAttribute('stroke-width', stone.color === 'BLACK' ? '2' : '0.7');
 
                 const text = document.createElementNS(svgNS, 'text');
@@ -1308,7 +1282,7 @@ function App() {
                 text.setAttribute('y', cy.toString());
                 text.setAttribute('dy', '.35em');
                 text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('fill', stone.color === 'BLACK' ? '#FEFEFE' : '#000001');
+                text.setAttribute('fill', stone.color === 'BLACK' ? '#FFFFFF' : '#000000');
                 const fontSize = (stone.text && stone.text.length >= 3) ? '18' : '26';
                 text.setAttribute('font-size', fontSize);
                 text.setAttribute('font-family', 'Arial, sans-serif');
@@ -1460,8 +1434,8 @@ function App() {
                     c.setAttribute('cx', drawX.toString());
                     c.setAttribute('cy', '0');
                     c.setAttribute('r', '18.4');
-                    c.setAttribute('fill', visStone.color === 'BLACK' ? '#000001' : '#FEFEFE');
-                    c.setAttribute('stroke', '#000001');
+                    c.setAttribute('fill', visStone.color === 'BLACK' ? '#000000' : '#FFFFFF');
+                    c.setAttribute('stroke', '#000000');
                     c.setAttribute('stroke-width', visStone.color === 'BLACK' ? '2' : '0.7');
                     itemG.appendChild(c);
 
@@ -1470,7 +1444,7 @@ function App() {
                     t.setAttribute('y', '0');
                     t.setAttribute('dy', '.35em');
                     t.setAttribute('text-anchor', 'middle');
-                    t.setAttribute('fill', visStone.color === 'BLACK' ? '#FEFEFE' : '#000001');
+                    t.setAttribute('fill', visStone.color === 'BLACK' ? '#FFFFFF' : '#000000');
                     const fs = (visStone.text && visStone.text.length >= 3) ? '18' : '26';
                     t.setAttribute('font-size', fs);
                     t.setAttribute('font-family', 'Arial, sans-serif');
@@ -1487,7 +1461,7 @@ function App() {
                 openB.setAttribute('y', '0');
                 openB.setAttribute('dy', '.35em');
                 openB.setAttribute('text-anchor', 'middle');
-                openB.setAttribute('fill', '#000001');
+                openB.setAttribute('fill', '#000000');
                 openB.setAttribute('font-size', '24');
                 openB.setAttribute('font-weight', 'bold');
                 openB.textContent = "[";
@@ -1523,8 +1497,8 @@ function App() {
                         c.setAttribute('cx', stoneCenterX.toString());
                         c.setAttribute('cy', '0');
                         c.setAttribute('r', '18.4');
-                        c.setAttribute('fill', (hidStone.color === 'BLACK') ? '#000001' : '#FEFEFE');
-                        c.setAttribute('stroke', '#000001');
+                        c.setAttribute('fill', (hidStone.color === 'BLACK') ? '#000000' : '#FFFFFF');
+                        c.setAttribute('stroke', '#000000');
                         c.setAttribute('stroke-width', (hidStone.color === 'BLACK' ? '2' : '0.7'));
                         itemG.appendChild(c);
 
@@ -1533,7 +1507,7 @@ function App() {
                         t.setAttribute('y', '0');
                         t.setAttribute('dy', '.35em');
                         t.setAttribute('text-anchor', 'middle');
-                        t.setAttribute('fill', (hidStone.color === 'BLACK') ? '#FEFEFE' : '#000001');
+                        t.setAttribute('fill', (hidStone.color === 'BLACK') ? '#FFFFFF' : '#000000');
                         const fs = (hidStone.text && hidStone.text.length >= 3) ? '18' : '26';
                         t.setAttribute('font-size', fs);
                         t.setAttribute('font-family', 'Arial, sans-serif');
@@ -1550,7 +1524,7 @@ function App() {
                 closeB.setAttribute('y', '0');
                 closeB.setAttribute('dy', '.35em');
                 closeB.setAttribute('text-anchor', 'middle');
-                closeB.setAttribute('fill', '#000001');
+                closeB.setAttribute('fill', '#000000');
                 closeB.setAttribute('font-size', '24');
                 closeB.setAttribute('font-weight', 'bold');
                 closeB.textContent = "]";
@@ -1590,8 +1564,8 @@ function App() {
                 c.setAttribute('cx', cx.toString());
                 c.setAttribute('cy', cy.toString());
                 c.setAttribute('r', '18.4');
-                c.setAttribute('fill', stone.color === 'BLACK' ? '#000001' : '#FEFEFE');
-                c.setAttribute('stroke', '#000001');
+                c.setAttribute('fill', stone.color === 'BLACK' ? '#000000' : '#FFFFFF');
+                c.setAttribute('stroke', '#000000');
                 c.setAttribute('stroke-width', stone.color === 'BLACK' ? '2' : '0.7');
                 stoneGroup.appendChild(c);
 
@@ -1600,7 +1574,7 @@ function App() {
                 t.setAttribute('y', cy.toString());
                 t.setAttribute('dy', '.35em');
                 t.setAttribute('text-anchor', 'middle');
-                t.setAttribute('fill', stone.color === 'BLACK' ? '#FEFEFE' : '#000001');
+                t.setAttribute('fill', stone.color === 'BLACK' ? '#FFFFFF' : '#000000');
                 const fontSize = (stone.text && stone.text.length >= 3) ? '18' : '26';
                 t.setAttribute('font-size', fontSize);
                 t.setAttribute('font-family', 'Arial, sans-serif');
@@ -1623,23 +1597,28 @@ function App() {
             finalH += 50;
         }
 
+        // Final Sweep: Move board markers to the top so they aren't covered by collision stones or legend background
+        const markersInClone = clone.querySelectorAll('.board-marker');
+        markersInClone.forEach(m => clone.appendChild(m));
 
         // No width extension needed as we wrap content.
         clone.setAttribute('viewBox', `${finalX} ${finalY} ${finalW} ${finalH}`);
         clone.setAttribute('width', `${finalW}`);
         clone.setAttribute('height', `${finalH}`);
 
-        if (isSvg) {
+        if (mode === 'SVG') {
             await exportToSvg(clone, { backgroundColor: bgColor, destination: destination, filename: filename });
+        } else if (mode === 'EMF') {
+            await exportToEmf(clone, { backgroundColor: bgColor, destination: destination, filename: filename });
         } else {
             await exportToPng(clone, { scale: 3, backgroundColor: bgColor, destination: destination, filename });
         }
-    }, [hiddenMoves, stonesToDraw, showCoordinates, showCapturedInExport, isMonochrome, specialLabels, boardSize]);
+    }, [hiddenMoves, stonesToDraw, showCoordinates, showCapturedInExport, isMonochrome, specialLabels, boardSize, svgRef]);
 
 
     const handleExport = useCallback(async (forcedMode?: 'SVG' | 'PNG', destination?: 'CLIPBOARD' | 'DOWNLOAD') => {
         const modeToUse = forcedMode || exportMode;
-        const isSvg = modeToUse === 'SVG';
+        // modeToUse for actual export call
 
         const filename = ''; // Empty filename as requested
 
@@ -1654,6 +1633,10 @@ function App() {
         };
 
         // Auto-Enable Figure Mode (Show Label A) for Export
+        setIsFigureMode(true);
+        // Wait for React Render (Important for visual updates like Labels)
+        await new Promise(r => setTimeout(r, 100));
+
         try {
             // MERGE: Captured Stones + Collision Restored Stones (for "Leave 5")
             // Requirement: "If placement is taken, it must not be erased".
@@ -1661,12 +1644,130 @@ function App() {
             const captured = getRestoredStones();
             const restored = captured;
 
-            await performExport(fullBounds, restored, { isSvg, destination, filename });
+            await performExport(fullBounds, restored, { mode: modeToUse, destination, filename });
         } catch (err) {
             console.error("Export Error:", err);
+            showToast(t('alert.exportError'), 'error');
+        } finally {
+            setIsFigureMode(false);
         }
 
-    }, [boardSize, exportMode, showCapturedInExport, getRestoredStones, performExport]);
+    }, [boardSize, exportMode, getRestoredStones, performExport]);
+
+    const handleExportGif = useCallback(async () => {
+        if (!svgRef.current) return;
+
+        // 1. Pre-Save Flow: First get the file handle to prevent timeout
+        let writable: any;
+        let handle: any;
+
+        try {
+            // @ts-ignore
+            if (window.showSaveFilePicker) {
+                // @ts-ignore
+                handle = await window.showSaveFilePicker({
+                    id: 'gorw_gif',
+                    types: [{
+                        description: 'GIF Animation',
+                        accept: { 'image/gif': ['.gif'] },
+                    }],
+                });
+                writable = await handle.createWritable();
+            }
+        } catch (err) {
+            if ((err as Error).name === 'AbortError') return;
+            console.warn('File Picker failed, fallback to direct download...', err);
+        }
+
+        setIsGifExporting(true);
+        setGifProgress(0);
+
+        try {
+            const originalNodeId = currentNodeId;
+            const originalFigureMode = isFigureMode;
+            setIsFigureMode(true);
+
+            // Navigate through the main path (Full game sequence)
+            const mainPath = getMainPath(rootNode);
+            const frames: string[] = [];
+
+            // Capture frames
+            for (let i = 0; i < mainPath.length; i++) {
+                flushSync(() => {
+                    setCurrentNodeId(mainPath[i].id);
+                });
+                // Wait for render
+                await new Promise(r => setTimeout(r, 100));
+
+                const CELL_SIZE = 40;
+                const MARGIN = 40;
+                const width = (boardSize) * CELL_SIZE + MARGIN * 2;
+                const height = (boardSize) * CELL_SIZE + MARGIN * 2;
+
+                // Export logic using the same approach as exportToPng
+                // But we need a data URL for gifshot
+                // prepareSvgForExport already clones internally
+                const clone = prepareSvgForExport(svgRef.current!, { backgroundColor: isMonochrome ? '#FFFFFF' : '#DCB35C' });
+
+                // Final Sweep for markers in GIF frames
+                const markersInClone = clone.querySelectorAll('.board-marker');
+                markersInClone.forEach(m => clone.appendChild(m));
+
+                // Add restored stones to clone (same as performExport)
+                // ... (simplified for now, ideally reused performExport's logic)
+
+                const pngBlob = await svgToPngBlob(clone, width, height, 2, isMonochrome ? '#FFFFFF' : '#DCB35C');
+                const dataUrl = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(pngBlob);
+                });
+
+                frames.push(dataUrl);
+                setGifProgress(Math.round(((i + 1) / mainPath.length) * 100));
+            }
+
+            // Generate GIF
+            const gifDataUrl = await createGifFromImages(frames, {
+                width: 800,
+                height: 800,
+                interval: playbackSpeed / 1000,
+                progressCallback: (p) => {
+                    // gifshot progress is 0 to 1
+                    setGifProgress(100 + Math.round(p * 100)); // Special range for generation phase
+                }
+            });
+
+            const gifBlob = await (await fetch(gifDataUrl)).blob();
+
+            if (writable) {
+                await writable.write(gifBlob);
+                await writable.close();
+            } else {
+                // Fallback direct download
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(gifBlob);
+                link.download = 'game.gif';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            }
+
+            // Restore original state
+            flushSync(() => {
+                setCurrentNodeId(originalNodeId);
+            });
+            setIsFigureMode(originalFigureMode);
+
+        } catch (err) {
+            console.error("GIF Export Error:", err);
+            showToast(t('alert.gifFailed'), 'error');
+        } finally {
+            setIsGifExporting(false);
+            setGifProgress(0);
+        }
+    }, [svgRef, history, rootNode, currentNodeId, boardSize, isMonochrome, playbackSpeed, isFigureMode, getRestoredStones, setCurrentNodeId]);
 
     const handleExportSelection = useCallback(async () => {
         if (!selectionStart || !selectionEnd) return;
@@ -1677,11 +1778,16 @@ function App() {
         const y2 = Math.max(selectionStart.y, selectionEnd.y);
 
         try {
+            setIsFigureMode(true);
+            await new Promise(r => setTimeout(r, 50));
             const captured = getRestoredStones(); // Always included
             const restored = captured;
-            await performExport({ minX: x1, maxX: x2, minY: y1, maxY: y2 }, restored, { isSvg: exportMode === 'SVG' });
+            await performExport({ minX: x1, maxX: x2, minY: y1, maxY: y2 }, restored, { mode: exportMode });
         } catch (e) {
             console.error(e);
+            showToast(t('alert.exportError'), 'error');
+        } finally {
+            setIsFigureMode(false);
         }
 
         // Reset Selection
@@ -1690,141 +1796,12 @@ function App() {
         setSelectionEnd(null);
         setDragMode('SELECTING');
         setMoveSource(null);
-    }, [selectionStart, selectionEnd, getBounds, getRestoredStones, showCapturedInExport, performExport]);
+    }, [selectionStart, selectionEnd, getBounds, getRestoredStones, showCapturedInExport, performExport, exportMode, setIsFigureMode]);
 
-    const handleExportGif = useCallback(async () => {
-        if (!svgRef.current) return;
 
-        // --- Pre-Save Dialog (Must happen during user activation) ---
-        let handle = null;
-        try {
-            // Force empty filename preference
-            handle = await getFileHandle('image/gif', '');
-            if (!handle && !('showSaveFilePicker' in window)) {
-                // Not supported, proceed to old flow
-            } else if (!handle) {
-                return; // User Cancelled
-            }
-        } catch (e) {
-            return; // User Cancelled
-        }
-
-        gifFileHandleRef.current = handle;
-
-        // Stop any active auto-play
-        setIsPlaying(false);
-        setIsExportingGif(true);
-        setGifProgress(0);
-
-        // Initialize Export State
-        originalNodeIdRef.current = currentNodeId;
-
-        // Calculate sequence: History + Future (Main Branch)
-        const sequence: GameNode[] = [...history];
-        let node = currentState;
-        while (node.children.length > 0) {
-            node = node.children[0];
-            sequence.push(node);
-        }
-        gifTargetNodesRef.current = sequence;
-        gifFramesRef.current = [];
-
-        // Start State Machine (triggers useEffect via state change)
-        setGifExportIndex(0);
-
-    }, [currentNodeId, history, svgRef]);
 
     // State-Driven GIF Export Effect
-    useEffect(() => {
-        if (!isExportingGif || gifExportIndex === -1) return;
 
-        const targetNodes = gifTargetNodesRef.current;
-        const total = targetNodes.length;
-
-        // --- Completion Check ---
-        if (gifExportIndex >= total) {
-            // Finished Capturing. Proceed to Compilation.
-            const compile = async () => {
-                try {
-                    const frames = gifFramesRef.current;
-                    const gifDataUrl = await createGifFromImages(frames, {
-                        width: 600,
-                        height: 600,
-                        interval: playbackSpeed / 1000,
-                        progressCallback: (p) => setGifProgress(50 + Math.round(p * 50)),
-                    });
-
-                    // Conversion and Save
-                    const gifBlob = await (await fetch(gifDataUrl)).blob();
-
-
-
-                    if (gifFileHandleRef.current) {
-                        // Use the pre-selected handle
-                        await writeToHandle(gifFileHandleRef.current, gifBlob);
-                        alert("保存しました。");
-                    } else {
-                        // Fallback (Old Flow: chrome.downloads)
-                        // If we fall back here, we USE the filename logic in exportUtils (game.gif if empty)
-                        // This handles non-supported browsers or failed pickers safely.
-                        await saveFile(gifBlob, '', 'GIF Animation', 'image/gif');
-                    }
-                } catch (err) {
-                    console.error("GIF Compilation Error:", err);
-                    alert("GIFの作成に失敗しました。");
-                } finally {
-                    // Restore Original State
-                    setCurrentNodeId(originalNodeIdRef.current);
-                    setIsExportingGif(false);
-                    setGifProgress(0);
-                    setGifExportIndex(-1);
-                }
-            };
-            compile();
-            return;
-        }
-
-        // --- Capture Step ---
-        const step = async () => {
-            // Update Progress
-            setGifProgress(Math.round((gifExportIndex / total) * 50));
-
-            // Set Board State
-            setCurrentNodeId(targetNodes[gifExportIndex].id);
-
-            // Wait for Render + Playback Delay
-            await new Promise(r => setTimeout(r, Math.max(200, playbackSpeed)));
-
-            // Capture
-            if (svgRef.current) {
-                try {
-                    const svg = svgRef.current;
-                    const preparedSvg = prepareSvgForExport(svg, { backgroundColor: '#DCB35C' });
-                    const width = parseFloat(preparedSvg.getAttribute('width') || '0');
-                    const height = parseFloat(preparedSvg.getAttribute('height') || '0');
-                    const blob = await svgToPngBlob(preparedSvg, width, height, 1.5, '#DCB35C');
-                    const dataUrl = await new Promise<string>((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result as string);
-                        reader.readAsDataURL(blob);
-                    });
-                    gifFramesRef.current.push(dataUrl);
-                } catch (e) {
-                    console.error("Frame Capture Error", e);
-                }
-            }
-
-            // Allow interrupt
-            if (!isExportingGif) return;
-
-            // Next Frame
-            setGifExportIndex(prev => prev + 1);
-        };
-
-        const timer = setTimeout(step, 0);
-        return () => clearTimeout(timer);
-
-    }, [gifExportIndex, isExportingGif, playbackSpeed]);
 
 
 
@@ -1884,46 +1861,32 @@ function App() {
         } catch (err) {
             if ((err as Error).name === 'AbortError') return;
             console.error('Open SGF failed', err);
+            showToast(t('alert.openError'), 'error');
         }
     };
 
     const handlePrintRequest = (settings: PrintSettings) => {
-        // Calculate Full History SGF if needed
-        let sgf;
-        if (settings.pagingType === 'WHOLE_FILE_FIGURE' || settings.pagingType === 'WHOLE_FILE_MOVE') {
-            // Traverse from Root to Leaf (Main Line from current split?)
-            // Usually Whole File means "The entire loaded game".
-            // Since we can't easily guess which branch, we use the current branch extended to leaf.
-            // But we need to start from ROOT.
-            let leaf = history[history.length - 1];
-            while (leaf.children && leaf.children.length > 0) {
-                leaf = leaf.children[0];
+        // 譜分け（Fu-wake）印刷 または 通常印刷の開始
+
+        flushSync(() => {
+            setPrintSettings(settings);
+            setShowPrintModal(false);
+            setIsPrintJob(true); // 印刷用コンテンツの生成
+        });
+
+        // 描画とメディアクエリの適用を確実にするため、短めのタイマーで実行
+        // 100ms はユーザーのジェスチャ（クリック）として認識される限界に近い安全圏
+        setTimeout(() => {
+            try {
+                window.focus();
+                window.print();
+            } catch (e) {
+                console.error("Print dialog failed", e);
+                showToast(t('alert.printError'), 'error');
             }
-
-            // Reconstruct path from ROOT to Leaf
-            // history[0] is root.
-            sgf = getSGFString();
-        } else {
-            sgf = getSGFString();
-        }
-
-        // Side Panel Workaround: Open in new tab to print
-        localStorage.setItem('gorw_temp_print_sgf', sgf);
-        localStorage.setItem('gorw_temp_print_settings', JSON.stringify(settings));
-        localStorage.setItem('gorw_temp_print_index', currentMoveIndex.toString());
-
-        // Open new tab (relative path to index.html)
-        const printWindow = window.open('index.html?print_job=true', '_blank');
-        if (!printWindow) {
-            flushSync(() => {
-                setPrintSettings(settings);
-                setShowPrintModal(false);
-            });
-            window.print();
-            return;
-        }
-
-        setShowPrintModal(false);
+            // 印刷後はフラグを下ろす（隠しコンテナを空にする）
+            setIsPrintJob(false);
+        }, 100);
     };
 
 
@@ -1972,7 +1935,7 @@ function App() {
                             const lastErr = chrome.runtime?.lastError;
                             if (lastErr) reject(lastErr);
                             else {
-                                notifyDownloadLocation(downloadId);
+                                notifyDownloadLocation(downloadId, (p) => showToast(t('alert.saved', { path: p }), 'success'));
                                 resolve();
                             }
                         }
@@ -1987,7 +1950,7 @@ function App() {
 
         // 3) それでも無理な場合は明示的に知らせる（自動DLは避ける）
         URL.revokeObjectURL(url);
-        alert('保存ダイアログを開けませんでした。拡張の「ダウンロード」権限を許可して再試行してください。');
+        showToast(t('alert.saveError'), 'error');
     };
 
     const handleOverwriteSave = async () => {
@@ -2053,10 +2016,19 @@ function App() {
         commitState(currentState.board, n, activeColor, boardSize, currentState.markers);
     };
 
-    const clearBoard = () => {
+    const doClearBoard = () => {
         const newRoot = createNode(null, Array(boardSize).fill(null).map(() => Array(boardSize).fill(null)), 1, getInitialColor(), boardSize);
         setRootNode(newRoot);
         setCurrentNodeId(newRoot.id);
+        setShowClearConfirm(false);
+    };
+
+    const clearBoard = (skipConfirm = false) => {
+        if (skipConfirm) {
+            doClearBoard();
+        } else {
+            setShowClearConfirm(true);
+        }
     };
 
     const handlePasteSGF = async () => {
@@ -2065,11 +2037,11 @@ function App() {
             if (text && (text.includes('(;') || text.includes('GM['))) {
                 loadSGF(text);
             } else {
-                alert('クリップボードに有効なSGFデータがありません。');
+                showToast(t('alert.pasteNoSGF'), 'error');
             }
         } catch (err) {
             console.error('Failed to read clipboard', err);
-            alert('クリップボードの読み込みに失敗しました。');
+            showToast(t('alert.pasteError'), 'error');
         }
     };
 
@@ -2152,9 +2124,10 @@ function App() {
                         const sgf = getSGFString();
                         try {
                             await navigator.clipboard.writeText(sgf);
-                            console.log('SGF Copied to clipboard');
+                            showToast(t('alert.copiedToClipboard'), 'success');
                         } catch (err) {
                             console.error('Failed to copy SGF', err);
+                            showToast(t('alert.clipboardError'), 'error');
                         }
                         break;
                     case 'p': // Ctrl+P
@@ -2233,7 +2206,7 @@ function App() {
                 };
                 reader.readAsText(file);
             } else {
-                alert('SGF files only (.sgf)');
+                showToast(t('alert.sgfOnly'), 'error');
             }
         } else {
             // Check for Text Content (Drag selection from web/editor)
@@ -2277,7 +2250,7 @@ function App() {
     return (
         <>
             <div
-                className={`p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none relative ${isDragging ? 'bg-blue-50 outline outline-4 outline-blue-400 outline-offset-[-4px]' : ''} ${isPrintJob ? '!hidden' : ''}`}
+                className={`p-2 sm:p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none relative ${isDragging ? 'bg-blue-50 outline outline-4 outline-blue-400 outline-offset-[-4px]' : ''} print:hidden`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -2292,12 +2265,7 @@ function App() {
                 )}
 
                 {/* Recording Indicator (Non-blocking) */}
-                {isExportingGif && (
-                    <div className="absolute top-4 right-4 z-[100] bg-red-600 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-pulse">
-                        <div className="w-3 h-3 bg-white rounded-full"></div>
-                        <span className="font-bold text-sm">{t('ui.exportingGif')} {gifProgress}%</span>
-                    </div>
-                )}
+
 
                 {/* Print Area Removed (Moved Outside) */}
                 <div className="flex justify-between w-full items-center mb-2">
@@ -2319,27 +2287,27 @@ function App() {
 
                         {/* Group 1: File Operations */}
                         <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
-                            <button onClick={clearBoard} title={t('tooltip.new')} className="w-6 h-6 rounded-md bg-white hover:bg-red-50 text-red-600 flex items-center justify-center font-bold transition-all text-sm shadow-sm">
+                            <button onClick={() => clearBoard()} title={t('tooltip.new')} aria-label={t('tooltip.new')} className="w-8 h-8 rounded-md bg-white hover:bg-red-50 text-red-600 flex items-center justify-center transition-all shadow-sm text-base">
                                 🗑️
                             </button>
-                            <button onClick={handleOpenSGF} title={t('tooltip.open')} className="w-6 h-6 rounded-md bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center font-bold transition-all text-sm shadow-sm">
+                            <button onClick={handleOpenSGF} title={t('tooltip.open')} aria-label={t('tooltip.open')} className="w-8 h-8 rounded-md bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-sm text-base">
                                 📂
                             </button>
-                            <button onClick={handleOverwriteSave} title={t('tooltip.save')} className="w-6 h-6 rounded-md bg-white hover:bg-green-50 text-green-700 flex items-center justify-center font-bold transition-all text-sm shadow-sm">
+                            <button onClick={handleOverwriteSave} title={t('tooltip.save')} aria-label={t('tooltip.save')} className="w-8 h-8 rounded-md bg-white hover:bg-green-50 text-green-700 flex items-center justify-center transition-all shadow-sm text-base">
                                 💾
                             </button>
-                            <button onClick={handleSaveSGF} title={t('tooltip.saveAs')} className="w-6 h-6 rounded-md bg-white hover:bg-orange-50 text-orange-600 flex items-center justify-center font-bold transition-all shadow-sm">
-                                <img src="/icons/save_as_v2.png" alt="Save As" className="w-4 h-4 object-contain opacity-80" />
+                            <button onClick={handleSaveSGF} title={t('tooltip.saveAs')} aria-label={t('tooltip.saveAs')} className="w-8 h-8 rounded-md bg-white hover:bg-orange-50 text-orange-600 flex items-center justify-center transition-all shadow-sm">
+                                <img src="/icons/save_as_v2.png" alt="Save As" className="w-5 h-5 object-contain opacity-80" />
                             </button>
-                            <button onClick={handlePasteSGF} title={t('tooltip.paste')} className="w-6 h-6 rounded-md bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center font-bold transition-all text-sm shadow-sm">
+                            <button onClick={handlePasteSGF} title={t('tooltip.paste')} aria-label={t('tooltip.paste')} className="w-8 h-8 rounded-md bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-sm text-base">
                                 📋
                             </button>
                             <button
                                 onClick={() => setShowGameInfoModal(true)}
-                                className="w-6 h-6 rounded-md bg-blue-500 text-white hover:bg-blue-600 flex items-center justify-center font-bold transition-all text-sm shadow-sm"
-                                title={t('tooltip.gameInfo')}
+                                className="w-8 h-8 rounded-md bg-blue-500 text-white hover:bg-blue-600 flex items-center justify-center transition-all shadow-sm text-base"
+                                title={t('tooltip.gameInfo')} aria-label={t('tooltip.gameInfo')}
                             >
-                                i
+                                ℹ️
                             </button>
                         </div>
 
@@ -2353,28 +2321,34 @@ function App() {
                                     e.stopPropagation();
                                     setShowPrintModal(true);
                                 }}
-                                className="w-6 h-6 rounded-md bg-white hover:bg-gray-50 text-gray-600 flex items-center justify-center font-bold text-sm transition-all shadow-sm"
-                                title={t('tooltip.print')}
+                                className="w-8 h-8 rounded-md bg-white hover:bg-gray-50 text-gray-600 flex items-center justify-center transition-all shadow-sm text-base"
+                                title={t('tooltip.print')} aria-label={t('tooltip.print')}
                             >
                                 🖨️
                             </button>
-
                             <button
                                 onClick={() => setShowCapturedInExport(!showCapturedInExport)}
-                                title={t('tooltip.showCaptured', { status: showCapturedInExport ? t('ui.on') : t('ui.off') })}
-                                className={`w-6 h-6 rounded-md flex items-center justify-center font-bold transition-all text-sm shadow-sm ${showCapturedInExport ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300' : 'bg-white text-gray-400 hover:text-purple-500'}`}
+                                title={t('tooltip.showCaptured', { status: showCapturedInExport ? t('ui.on') : t('ui.off') })} aria-label={t('tooltip.showCaptured', { status: showCapturedInExport ? t('ui.on') : t('ui.off') })}
+                                className={`w-8 h-8 rounded-md flex items-center justify-center transition-all shadow-sm text-base ${showCapturedInExport ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300' : 'bg-white text-gray-400 hover:text-purple-500'}`}
                             >
                                 👻
                             </button>
                             <button
+                                onClick={() => setShowNextMove(!showNextMove)}
+                                title={t('tooltip.showNextMove', { status: showNextMove ? t('ui.on') : t('ui.off') })} aria-label={t('tooltip.showNextMove', { status: showNextMove ? t('ui.on') : t('ui.off') })}
+                                className={`w-8 h-8 rounded-md flex items-center justify-center transition-all shadow-sm text-base ${showNextMove ? 'bg-green-100 text-green-700 ring-1 ring-green-300' : 'bg-white text-gray-400 hover:text-green-500'}`}
+                            >
+                                👁️
+                            </button>
+                            <button
                                 onClick={() => setShowNumbers(!showNumbers)}
-                                title={t('tooltip.showNumbers', { status: showNumbers ? t('ui.on') : t('ui.off') })}
-                                className={`w-6 h-6 rounded-md flex items-center justify-center font-bold transition-all text-sm shadow-sm ${showNumbers ? 'bg-cyan-100 text-cyan-700 ring-1 ring-cyan-300' : 'bg-white text-gray-400 hover:text-cyan-500'}`}
+                                title={t('tooltip.showNumbers', { status: showNumbers ? t('ui.on') : t('ui.off') })} aria-label={t('tooltip.showNumbers', { status: showNumbers ? t('ui.on') : t('ui.off') })}
+                                className={`w-8 h-8 rounded-md flex items-center justify-center transition-all shadow-sm text-base ${showNumbers ? 'bg-cyan-100 text-cyan-700 ring-1 ring-cyan-300' : 'bg-white text-gray-400 hover:text-cyan-500'}`}
                             >
                                 ⑨
                             </button>
-                            <button onClick={handlePass} disabled={mode !== 'NUMBERED'} title={t('tooltip.pass')}
-                                className="w-6 h-6 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50 font-bold flex items-center justify-center text-sm shadow-sm text-gray-700">
+                            <button onClick={handlePass} disabled={mode !== 'NUMBERED'} title={t('tooltip.pass')} aria-label={t('tooltip.pass')}
+                                className="w-8 h-8 rounded-md bg-gray-200 hover:bg-gray-300 disabled:opacity-50 flex items-center justify-center shadow-sm text-gray-700 text-base">
                                 ✋
                             </button>
                         </div>
@@ -2382,32 +2356,34 @@ function App() {
                         {/* Group 4: Export */}
                         <div className="flex bg-indigo-50 rounded-lg items-center px-0.5 py-0.5 border border-indigo-100 gap-0.5">
                             <button onClick={() => { if (selectionStart && selectionEnd) handleExportSelection(); else handleExport(); }}
-                                title={t('tooltip.copyAs', { format: exportMode })} className="w-6 h-6 rounded-md bg-white text-indigo-600 hover:bg-indigo-50 flex items-center justify-center font-bold transition-all text-sm shadow-sm">
+                                title={t('tooltip.copyAs', { format: exportMode })} aria-label={t('tooltip.copyAs', { format: exportMode })} className="w-8 h-8 rounded-md bg-white text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-all shadow-sm text-base">
                                 📷
                             </button>
                             <button
                                 onClick={() => handleExport('PNG', 'DOWNLOAD')}
-                                title={t('tooltip.savePng')}
-                                className="w-6 h-6 rounded-md bg-white text-indigo-600 hover:bg-indigo-50 flex items-center justify-center font-bold transition-all text-sm shadow-sm"
+                                title={t('tooltip.savePng')} aria-label={t('tooltip.savePng')}
+                                className="w-8 h-8 rounded-md bg-white text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-all shadow-sm text-base"
                             >
                                 ⬇️
                             </button>
                             <button
                                 onClick={handleExportGif}
-                                disabled={isExportingGif}
-                                title={t('tooltip.exportGif')}
-                                className="w-6 h-6 rounded-md bg-white text-indigo-600 hover:bg-indigo-50 flex items-center justify-center font-bold transition-all text-sm shadow-sm disabled:opacity-50"
+                                disabled={isGifExporting}
+                                title={t('tooltip.exportGif')} aria-label={t('tooltip.exportGif')}
+                                className="w-8 h-8 rounded-md bg-white text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-all shadow-sm disabled:opacity-50 relative overflow-hidden text-base"
                             >
-                                🎞️
+                                {isGifExporting ? (
+                                    <span className="text-[10px] font-sans">{gifProgress > 100 ? gifProgress - 100 : gifProgress}%</span>
+                                ) : '🎬'}
                             </button>
                             <button
-                                title={t('tooltip.toggleFormat')}
+                                title={t('tooltip.toggleFormat')} aria-label={t('tooltip.toggleFormat')}
                                 onClick={() => {
-                                    const next = exportMode === 'SVG' ? 'PNG' : 'SVG';
+                                    const next = exportMode === 'SVG' ? 'PNG' : (exportMode === 'PNG' ? 'EMF' : 'SVG');
                                     setExportMode(next);
                                     localStorage.setItem('gorw_export_mode', next);
                                 }}
-                                className="text-[9px] font-bold px-1 rounded bg-white border shadow-sm text-gray-600 hover:text-blue-600 ml-0.5 h-6 flex items-center"
+                                className="w-8 h-8 text-xs font-bold rounded-md bg-white border shadow-sm text-gray-600 hover:text-blue-600 flex items-center justify-center"
                             >
                                 {exportMode}
                             </button>
@@ -2422,22 +2398,22 @@ function App() {
                                     const nextIdx = (langs.indexOf(language) + 1) % langs.length;
                                     setLanguage(langs[nextIdx]);
                                 }}
-                                className="h-6 px-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 flex items-center justify-center font-bold text-[10px] transition-all border border-gray-200"
+                                className="h-8 px-2 rounded-md bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 flex items-center justify-center font-bold text-xs transition-all border border-gray-200"
                                 title={`Language: ${languageNames[language]}`}
                             >
                                 {language.toUpperCase()}
                             </button>
                             <button
                                 onClick={() => window.open('index.html', '_blank')}
-                                className="w-6 h-6 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center font-bold text-[10px] transition-all"
-                                title={t('tooltip.openNewTab')}
+                                className="w-8 h-8 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center font-bold text-sm transition-all"
+                                title={t('tooltip.openNewTab')} aria-label={t('tooltip.openNewTab')}
                             >
                                 ↗
                             </button>
                             <button
                                 onClick={() => setShowHelp(true)}
-                                className="w-6 h-6 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center font-bold text-xs transition-all"
-                                title={t('tooltip.help')}
+                                className="w-8 h-8 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 flex items-center justify-center font-bold text-sm transition-all"
+                                title={t('tooltip.help')} aria-label={t('tooltip.help')}
                             >
                                 ?
                             </button>
@@ -2448,7 +2424,7 @@ function App() {
                 {/* Help Modal */}
                 {showHelp && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowHelp(false)}>
-                        <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full relative" onClick={e => e.stopPropagation()}>
+                        <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 max-w-sm w-full relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                             <button
                                 className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 font-bold text-lg"
                                 onClick={() => setShowHelp(false)}
@@ -2464,41 +2440,119 @@ function App() {
                                         <div className="text-xs text-gray-500">{t('help.clickDesc')}</div>
                                     </div>
                                 </div>
-                                <div className="w-6 text-center text-xl">⚙️</div>
-                                <div>
-                                    <div className="font-bold">{t('help.wheel')}</div>
-                                    <div className="text-xs text-gray-500">{t('help.wheelDesc')}</div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xl">✋</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.drag')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.dragDesc')}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xl">⚙️</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.wheel')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.wheelDesc')}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xs font-mono border rounded bg-gray-100">Ctrl+F</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.copy')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.copyDesc')}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xs font-mono border rounded bg-gray-100">Ctrl+V</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.sgfPaste')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.sgfPasteDesc')}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xl">🔢</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.modeSwitch')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.modeSwitchDesc')}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xl">💾</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.fileOps')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.fileOpsDesc')}</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 text-center text-xl">🖨️</div>
+                                    <div>
+                                        <div className="font-bold">{t('help.printExport')}</div>
+                                        <div className="text-xs text-gray-500">{t('help.printExportDesc')}</div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="w-6 text-center text-xl">⚙️</div>
-                                <div>
-                                    <div className="font-bold">{t('help.wheel')}</div>
-                                    <div className="text-xs text-gray-500">{t('help.wheelDesc')}</div>
+                            {/* Keyboard Shortcuts Section */}
+                            <div className="mt-4 pt-3 border-t border-gray-200">
+                                <h3 className="text-sm font-bold text-gray-700 mb-2">{t('help.shortcuts')}</h3>
+                                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                                    {([
+                                        ['Alt+N', t('help.shortcutNew')],
+                                        ['Ctrl+O', t('help.shortcutOpen')],
+                                        ['Ctrl+S', t('help.shortcutSave')],
+                                        ['Ctrl+C', t('help.shortcutCopySgf')],
+                                        ['Ctrl+F', t('help.shortcutCopyImg')],
+                                        ['Ctrl+V', t('help.shortcutPaste')],
+                                        ['Ctrl+P', t('help.shortcutPrint')],
+                                        ['Ctrl+Z', t('help.shortcutUndo')],
+                                        ['Ctrl+Y', t('help.shortcutRedo')],
+                                        ['← / →', t('help.shortcutNav')],
+                                        ['Delete', t('help.shortcutDelete')],
+                                    ] as const).flatMap(([key, desc], i) => [
+                                        <span key={`k${i}`} className="font-mono bg-gray-100 border rounded px-1 text-center text-gray-600">{key}</span>,
+                                        <span key={`d${i}`} className="text-gray-600">{desc}</span>,
+                                    ])}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="w-6 text-center text-xs font-mono border rounded bg-gray-100">Ctrl+F</div>
-                                <div>
-                                    <div className="font-bold">{t('help.copy')}</div>
-                                    <div className="text-xs text-gray-500">{t('help.copyDesc')}</div>
+                            <div className="mt-4 pt-3 border-t border-gray-200">
+                                <div className="text-xs text-gray-500 text-center">
+                                    <div>{t('about.author')}</div>
+                                    <div className="flex justify-center gap-3 mt-1">
+                                        <a href="https://mimurago.jp" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">🌐 {t('about.blog')}</a>
+                                        <a href="https://www.youtube.com/@mimurago" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">📺 {t('about.youtube')}</a>
+                                        <a href="https://ichikawakids.com" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">🏠 {t('about.dojo')}</a>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="w-6 text-center text-xs font-mono border rounded bg-gray-100">Ctrl+V</div>
-                                <div>
-                                    <div className="font-bold">{t('help.sgfPaste')}</div>
-                                    <div className="text-xs text-gray-500">{t('help.sgfPasteDesc')}</div>
-                                </div>
+                            <div className="mt-3 text-center text-xs text-gray-400">
+                                Snap Goban {displayVersion}
                             </div>
-                        </div>
-                        <div className="mt-6 text-center text-xs text-gray-400">
-                            Snap Goban {displayVersion}
                         </div>
                     </div>
                 )}
 
-                {/* Print Settings Modal */}
+                {/* Clear Confirm Modal */}
+                {showClearConfirm && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowClearConfirm(false)}>
+                        <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                            <h2 className="text-lg font-bold mb-2 text-gray-800">{t('confirm.clearTitle')}</h2>
+                            <p className="text-sm text-gray-600 mb-6">{t('confirm.clearDesc')}</p>
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    onClick={() => setShowClearConfirm(false)}
+                                    className="px-4 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-100 transition-colors"
+                                >
+                                    {t('btn.cancel')}
+                                </button>
+                                <button
+                                    onClick={doClearBoard}
+                                    className="px-4 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                >
+                                    {t('btn.clearConfirm')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Print Settings Modal */}
                 {showPrintModal && (
                     <PrintSettingsModal
@@ -2515,26 +2569,37 @@ function App() {
                 {showGameInfoModal && (
                     <GameInfoModal
                         onClose={() => setShowGameInfoModal(false)}
-                        blackName={blackName} setBlackName={setBlackName}
-                        blackRank={blackRank} setBlackRank={setBlackRank}
-                        blackTeam={blackTeam} setBlackTeam={setBlackTeam}
-                        whiteName={whiteName} setWhiteName={setWhiteName}
-                        whiteRank={whiteRank} setWhiteRank={setWhiteRank}
-                        whiteTeam={whiteTeam} setWhiteTeam={setWhiteTeam}
-                        komi={komi} setKomi={setKomi}
-                        handicap={handicap} setHandicap={setHandicap}
-                        result={gameResult} setResult={setGameResult}
-                        gameName={gameName} setGameName={setGameName}
-                        event={gameEvent} setEvent={setGameEvent}
-                        date={gameDate} setDate={setGameDate}
-                        place={gamePlace} setPlace={setGamePlace}
-                        round={gameRound} setRound={setGameRound}
-                        time={gameTime} setTime={setGameTime}
-                        user={gameUser} setUser={setGameUser}
-                        source={gameSource} setSource={setGameSource}
-                        gameComment={gameComment} setGameComment={setGameComment}
-                        copyright={gameCopyright} setCopyright={setGameCopyright}
-                        annotation={gameAnnotation} setAnnotation={setGameAnnotation}
+                        onSave={(data) => {
+                            setBlackName(data.blackName);
+                            setBlackRank(data.blackRank);
+                            setBlackTeam(data.blackTeam);
+                            setWhiteName(data.whiteName);
+                            setWhiteRank(data.whiteRank);
+                            setWhiteTeam(data.whiteTeam);
+                            setKomi(data.komi);
+                            setHandicap(data.handicap);
+                            setGameResult(data.result);
+                            setGameName(data.gameName);
+                            setGameEvent(data.event);
+                            setGameDate(data.date);
+                            setGamePlace(data.place);
+                            setGameRound(data.round);
+                            setGameTime(data.time);
+                            setGameUser(data.user);
+                            setGameSource(data.source);
+                            setGameComment(data.gameComment);
+                            setGameCopyright(data.copyright);
+                            setGameAnnotation(data.annotation);
+                        }}
+                        initialData={{
+                            blackName, blackRank, blackTeam,
+                            whiteName, whiteRank, whiteTeam,
+                            komi, handicap, result: gameResult,
+                            gameName, event: gameEvent, date: gameDate,
+                            place: gamePlace, round: gameRound, time: gameTime,
+                            user: gameUser, source: gameSource, gameComment,
+                            copyright: gameCopyright, annotation: gameAnnotation,
+                        }}
                     />
                 )}
 
@@ -2546,7 +2611,7 @@ function App() {
                             ? 'bg-gray-800 text-white border-gray-800'
                             : 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200'
                             }`}
-                        title={t('tooltip.monochrome')}
+                        title={t('tooltip.monochrome')} aria-label={t('tooltip.monochrome')}
                     >
                         {isMonochrome ? t('ui.monochrome') : t('ui.color')}
                     </button>
@@ -2575,13 +2640,13 @@ function App() {
                         onDragStart={handleDragStart}
                         onDragMove={handleDragMove}
                         onDragEnd={handleDragEnd}
-                        hiddenMoves={[]} // LEGEND HIDDEN ON SCREEN, ONLY FOR EXPORT
-                        prioritizeLabel={false}
                         specialLabels={specialLabels}
+                        hiddenMoves={isFigureMode ? [] : []}
+                        prioritizeLabel={isFigureMode}
                         nextNumber={nextNumber}
                         activeColor={activeColor}
                         markers={history[currentMoveIndex]?.markers || []}
-                        nextMoves={branchCandidates}
+                        nextMoves={(branchCandidates.length > 1 || showNextMove) ? branchCandidates : []}
                         onNextMoveClick={handleBranchClick}
                     />
 
@@ -2593,16 +2658,16 @@ function App() {
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleExportSelection(); }}
                                     className="bg-green-600 text-white text-xs font-bold px-3 py-1 rounded shadow hover:bg-green-700 transition-all flex items-center gap-1"
-                                    title={t('tooltip.copySelection')}
+                                    title={t('tooltip.copySelection')} aria-label={t('tooltip.copySelection')}
                                 >
-                                    <span>✂️</span> Copy
+                                    <span>✂️</span> {t('ui.copy')}
                                 </button>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleZoomToSelection(); }}
                                     className="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded shadow hover:bg-blue-700 transition-all flex items-center gap-1"
-                                    title={t('tooltip.cropSelection')}
+                                    title={t('tooltip.cropSelection')} aria-label={t('tooltip.cropSelection')}
                                 >
-                                    <span>🔍</span> Zoom
+                                    <span>🔍</span> {t('ui.zoom')}
                                 </button>
                             </>
                         )}
@@ -2612,23 +2677,23 @@ function App() {
                             <button
                                 onClick={(e) => { e.stopPropagation(); setViewRange(null); }}
                                 className="bg-gray-700 text-white text-xs font-bold px-3 py-1 rounded shadow hover:bg-gray-800 transition-all flex items-center gap-1 opacity-80 hover:opacity-100"
-                                title={t('tooltip.resetView')}
+                                title={t('tooltip.resetView')} aria-label={t('tooltip.resetView')}
                             >
-                                <span>↺</span> Reset
+                                <span>↺</span> {t('ui.reset')}
                             </button>
                         )}
                     </div>
                 </div>
 
                 {/* Controls */}
-                <div className="bg-white p-4 rounded shadow w-full space-y-4">
+                <div className="bg-white p-2 sm:p-4 rounded shadow w-full space-y-3 sm:space-y-4">
 
                     {/* Mode Switch (Compact Icons) & Navigation */}
-                    <div className="flex justify-center items-center space-x-1 border-b pb-2 flex-wrap gap-y-2">
+                    <div className="flex justify-center items-center space-x-1 border-b pb-2 flex-wrap gap-y-1 sm:gap-y-2">
                         {/* Black Stone (Simple) */}
                         <button
-                            title={t('tooltip.placeBlack')}
-                            className={`p-1 rounded-full transition-all ${mode === 'SIMPLE' && activeColor === 'BLACK' ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'hover:bg-gray-100 opacity-60 hover:opacity-100'}`}
+                            title={t('tooltip.placeBlack')} aria-label={t('tooltip.placeBlack')}
+                            className={`p-1.5 rounded-full transition-all ${mode === 'SIMPLE' && activeColor === 'BLACK' ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'hover:bg-gray-100 opacity-60 hover:opacity-100'}`}
                             onClick={() => {
                                 setMode('SIMPLE');
                                 setToolMode('STONE');
@@ -2637,15 +2702,15 @@ function App() {
                                 try { localStorage.setItem('gorw_active_color', 'BLACK'); } catch (e) { }
                             }}
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" className="text-black">
+                            <svg width="24" height="24" viewBox="0 0 24 24" className="text-black">
                                 <circle cx="12" cy="12" r="10" fill="currentColor" />
                             </svg>
                         </button>
 
                         {/* White Stone (Simple) */}
                         <button
-                            title={t('tooltip.placeWhite')}
-                            className={`p-1 rounded-full transition-all ${mode === 'SIMPLE' && activeColor === 'WHITE' ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'hover:bg-gray-100 opacity-60 hover:opacity-100'}`}
+                            title={t('tooltip.placeWhite')} aria-label={t('tooltip.placeWhite')}
+                            className={`p-1.5 rounded-full transition-all ${mode === 'SIMPLE' && activeColor === 'WHITE' ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'hover:bg-gray-100 opacity-60 hover:opacity-100'}`}
                             onClick={() => {
                                 setMode('SIMPLE');
                                 setToolMode('STONE');
@@ -2654,15 +2719,15 @@ function App() {
                                 try { localStorage.setItem('gorw_active_color', 'WHITE'); } catch (e) { }
                             }}
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" className="text-gray-600">
+                            <svg width="24" height="24" viewBox="0 0 24 24" className="text-gray-600">
                                 <circle cx="12" cy="12" r="9.5" fill="white" stroke="currentColor" strokeWidth="1" />
                             </svg>
                         </button>
 
                         {/* Numbered Stone */}
                         <button
-                            title={t('tooltip.numberedMode', { color: activeColor === 'BLACK' ? t('ui.black') : t('ui.white') })}
-                            className={`p-1 rounded-full transition-all ${mode === 'NUMBERED' ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'hover:bg-gray-100 opacity-60 hover:opacity-100'}`}
+                            title={t('tooltip.numberedMode', { color: activeColor === 'BLACK' ? t('ui.black') : t('ui.white') })} aria-label={t('tooltip.numberedMode', { color: activeColor === 'BLACK' ? t('ui.black') : t('ui.white') })}
+                            className={`p-1.5 rounded-full transition-all ${mode === 'NUMBERED' ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'hover:bg-gray-100 opacity-60 hover:opacity-100'}`}
                             onClick={() => {
                                 if (mode === 'NUMBERED') {
                                     const next = activeColor === 'BLACK' ? 'WHITE' : 'BLACK';
@@ -2684,7 +2749,7 @@ function App() {
                                 try { localStorage.setItem('gorw_active_color', next); } catch (e) { }
                             }}
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" className={activeColor === 'BLACK' ? "text-black" : "text-gray-600"}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" className={activeColor === 'BLACK' ? "text-black" : "text-gray-600"}>
                                 <circle cx="12" cy="12" r={activeColor === 'BLACK' ? "10" : "9.5"} fill={activeColor === 'BLACK' ? "currentColor" : "white"} stroke={activeColor === 'WHITE' ? "currentColor" : "none"} strokeWidth="1" />
                                 <text x="12" y="17" textAnchor="middle" fill={activeColor === 'BLACK' ? "white" : "black"} fontSize="14" fontWeight="bold" fontFamily="sans-serif">1</text>
                             </svg>
@@ -2696,7 +2761,7 @@ function App() {
                         {/* Combined A / Symbol Tool */}
                         <div className="flex items-center">
                             <button
-                                title={t('tooltip.labelMode')}
+                                title={t('tooltip.labelMode')} aria-label={t('tooltip.labelMode')}
                                 onClick={() => setToolMode('LABEL')}
                                 className={`w-8 h-8 font-bold border rounded-l flex items-center justify-center transition-all ${toolMode === 'LABEL' ? 'bg-blue-100 border-blue-500 text-blue-700 z-10' : 'bg-white border-gray-300 hover:bg-gray-100'}`}
                             >
@@ -2704,7 +2769,7 @@ function App() {
                             </button>
                             <div className="relative">
                                 <select
-                                    title={t('tooltip.symbolMode')}
+                                    title={t('tooltip.symbolMode')} aria-label={t('tooltip.symbolMode')}
                                     value={toolMode === 'SYMBOL' ? selectedSymbol : ''}
                                     onChange={(e) => {
                                         const val = e.target.value as SymbolType;
@@ -2734,30 +2799,30 @@ function App() {
 
                         {/* Navigation Group (Moved here form Top) */}
                         <div className="flex bg-gray-100 rounded p-0.5 gap-0.5 items-center">
-                            <button onClick={deleteLastMove} disabled={currentMoveIndex === 0} title={t('tooltip.deleteMove')}
-                                className="w-7 h-7 rounded bg-white hover:bg-red-50 text-red-700 disabled:opacity-50 disabled:bg-gray-50 flex items-center justify-center font-bold text-sm transition-all shadow-sm border border-gray-200 mr-1">
+                            <button onClick={deleteLastMove} disabled={currentMoveIndex === 0} title={t('tooltip.deleteMove')} aria-label={t('tooltip.deleteMove')}
+                                className="w-8 h-8 rounded bg-white hover:bg-red-50 text-red-700 disabled:opacity-50 disabled:bg-gray-50 flex items-center justify-center font-bold text-sm transition-all shadow-sm border border-gray-200 mr-1">
                                 ⌫
                             </button>
-                            <button onClick={restoreMove} disabled={currentState.children.length === 0} title={t('tooltip.restoreMove')}
-                                className="w-7 h-7 rounded bg-white hover:bg-blue-50 text-blue-700 disabled:opacity-50 disabled:bg-gray-50 flex items-center justify-center font-bold text-sm transition-all shadow-sm border border-gray-200 mr-2">
+                            <button onClick={restoreMove} disabled={currentState.children.length === 0} title={t('tooltip.restoreMove')} aria-label={t('tooltip.restoreMove')}
+                                className="w-8 h-8 rounded bg-white hover:bg-blue-50 text-blue-700 disabled:opacity-50 disabled:bg-gray-50 flex items-center justify-center font-bold text-sm transition-all shadow-sm border border-gray-200 mr-2">
                                 ↻
                             </button>
-                            <button onClick={stepFirst} disabled={currentMoveIndex === 0} title={t('tooltip.firstMove')} className="w-7 h-7 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-xs shadow-sm border border-gray-200">
+                            <button onClick={stepFirst} disabled={currentMoveIndex === 0} title={t('tooltip.firstMove')} aria-label={t('tooltip.firstMove')} className="w-8 h-8 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-sm shadow-sm border border-gray-200">
                                 |&lt;
                             </button>
-                            <button onClick={stepBack10} disabled={currentMoveIndex === 0} title={t('tooltip.back10')} className="w-7 h-7 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-xs shadow-sm border border-gray-200">
+                            <button onClick={stepBack10} disabled={currentMoveIndex === 0} title={t('tooltip.back10')} aria-label={t('tooltip.back10')} className="w-8 h-8 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-sm shadow-sm border border-gray-200">
                                 &lt;&lt;
                             </button>
-                            <button onClick={stepBack} disabled={currentMoveIndex === 0} title={t('tooltip.back')} className="w-7 h-7 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-sm shadow-sm border border-gray-200">
+                            <button onClick={stepBack} disabled={currentMoveIndex === 0} title={t('tooltip.back')} aria-label={t('tooltip.back')} className="w-8 h-8 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-sm shadow-sm border border-gray-200">
                                 &lt;
                             </button>
-                            <button onClick={stepForward} disabled={currentState.children.length === 0} title={t('tooltip.forward')} className="w-7 h-7 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-sm shadow-sm border border-gray-200">
+                            <button onClick={stepForward} disabled={currentState.children.length === 0} title={t('tooltip.forward')} aria-label={t('tooltip.forward')} className="w-8 h-8 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-sm shadow-sm border border-gray-200">
                                 &gt;
                             </button>
-                            <button onClick={stepForward10} disabled={currentState.children.length === 0} title={t('tooltip.forward10')} className="w-7 h-7 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-xs shadow-sm border border-gray-200">
+                            <button onClick={stepForward10} disabled={currentState.children.length === 0} title={t('tooltip.forward10')} aria-label={t('tooltip.forward10')} className="w-8 h-8 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-sm shadow-sm border border-gray-200">
                                 &gt;&gt;
                             </button>
-                            <button onClick={stepLast} disabled={currentState.children.length === 0} title={t('tooltip.lastMove')} className="w-7 h-7 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-xs shadow-sm border border-gray-200">
+                            <button onClick={stepLast} disabled={currentState.children.length === 0} title={t('tooltip.lastMove')} aria-label={t('tooltip.lastMove')} className="w-8 h-8 rounded bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-50 flex items-center justify-center font-bold text-sm shadow-sm border border-gray-200">
                                 &gt;|
                             </button>
 
@@ -2765,30 +2830,38 @@ function App() {
                             <button
                                 onClick={() => setIsPlaying(!isPlaying)}
                                 disabled={currentState.children.length === 0 && !isPlaying}
-                                className={`w-7 h-7 rounded flex items-center justify-center font-bold text-sm shadow-sm border transition-all ml-2
+                                className={`w-8 h-8 rounded flex items-center justify-center font-bold text-sm shadow-sm border transition-all ml-2
                                 ${isPlaying
                                         ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                                         : 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100'
                                     } disabled:opacity-50 disabled:bg-gray-50 disabled:text-gray-400`}
-                                title={isPlaying ? 'Stop Auto-Play' : 'Start Auto-Play'}
+                                title={isPlaying ? t('ui.autoPlayStop') : t('ui.autoPlayStart')}
                             >
                                 {isPlaying ? '⏸' : '▶'}
                             </button>
                         </div>
 
                         {/* Speed Control */}
-                        <select
-                            title="Playback Speed"
-                            value={playbackSpeed}
-                            onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
-                            style={{ height: '28px' }} // Explicit height to match buttons
-                            className="text-xs border border-gray-200 rounded px-1 w-16 text-center cursor-pointer hover:bg-gray-50 ml-1 bg-white"
-                        >
-                            <option value="2000">Slow</option>
-                            <option value="800">Normal</option>
-                            <option value="400">Fast</option>
-                            <option value="100">Max</option>
-                        </select>
+                        <div className="flex border border-gray-200 rounded overflow-hidden ml-1" title={t('tooltip.playbackSpeed')} aria-label={t('tooltip.playbackSpeed')}>
+                            {([
+                                { value: 2000, label: t('ui.speedSlow') },
+                                { value: 800, label: t('ui.speedNormal') },
+                                { value: 400, label: t('ui.speedFast') },
+                                { value: 100, label: t('ui.speedMax') },
+                            ] as const).map(({ value, label }) => (
+                                <button
+                                    key={value}
+                                    onClick={() => setPlaybackSpeed(value)}
+                                    className={`px-1.5 py-1 text-[10px] transition-colors ${
+                                        playbackSpeed === value
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-white text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
 
                         {/* Branch Candidates (if multiple branches exist) */}
                         {branchCandidates.length > 1 && (
@@ -2804,8 +2877,8 @@ function App() {
                                                 setCurrentNodeId(targetChild.id);
                                             }
                                         }}
-                                        className="w-6 h-6 rounded bg-white hover:bg-yellow-100 text-gray-800 border border-yellow-400 flex items-center justify-center font-bold text-xs shadow-sm transition-all"
-                                        title={t('tooltip.branch', { value: String(candidate.value), x: String(candidate.x), y: String(candidate.y) })}
+                                        className="w-8 h-8 rounded bg-white hover:bg-yellow-100 text-gray-800 border border-yellow-400 flex items-center justify-center font-bold text-sm shadow-sm transition-all"
+                                        title={t('tooltip.branch', { value: String(candidate.value), x: String(candidate.x), y: String(candidate.y) })} aria-label={t('tooltip.branch', { value: String(candidate.value), x: String(candidate.x), y: String(candidate.y) })}
                                     >
                                         {candidate.value}
                                     </button>
@@ -2818,13 +2891,13 @@ function App() {
 
 
                 {/* Tools: Coords, Size (NO NAVIGATION HERE) */}
-                <div className="flex flex-col gap-2 bg-gray-50 p-2 rounded">
+                <div className="flex flex-col gap-1 sm:gap-2 bg-gray-50 p-1.5 sm:p-2 rounded">
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setShowCoordinates(!showCoordinates)}
                             className={`text-xs px-2 py-1 rounded border ${showCoordinates ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300'} whitespace-nowrap`}
                         >
-                            Coords: {showCoordinates ? 'ON' : 'OFF'}
+                            {t('ui.coords')}: {showCoordinates ? t('ui.on') : t('ui.off')}
                         </button>
 
 
@@ -2833,7 +2906,7 @@ function App() {
 
                     {/* Size Switcher */}
                     <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
-                        <span className="text-xs text-gray-500">Size:</span>
+                        <span className="text-xs text-gray-500">{t('ui.boardSize')}:</span>
                         {[19, 13, 9].map(s => (
                             <button
                                 key={s}
@@ -2847,7 +2920,7 @@ function App() {
 
                     {mode === 'NUMBERED' && (
                         <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
-                            <label className="text-xs">Start #:</label>
+                            <label className="text-xs">{t('ui.startNumber')}:</label>
                             <input
                                 type="number"
                                 className="w-12 border rounded px-1 text-center"
@@ -2863,27 +2936,15 @@ function App() {
                 {/* Actions (Moved to Header) */}
                 {/* Actions (Moved to Header) */}
                 <div className="text-xs text-center text-gray-400 mt-2 space-y-1 pt-4 border-t border-gray-100">
-                    <div>L: Place / R: Delete / Wheel: Nav</div>
-                    <div>DblClick: Swap Color / Switch Tool</div>
-                    <div>**Ctrl+V: Paste SGF**</div>
+                    <div>{t('hint.line1')}</div>
+                    <div>{t('hint.line2')}</div>
+                    <div>{t('hint.line3')}</div>
+                    <div>{t('hint.line4')}</div>
                 </div>
             </div >
 
-            {/* Actual Print Content (Moved Outside Main Div) */}
-            {/* Actual Print Content (Moved Outside Main Div) */}
-            <div className={isPrintJob ? "block w-full font-serif text-sm bg-white" : "hidden print:block w-full font-serif text-sm bg-white"}>
-                {isPrintJob && (
-                    <div className="fixed top-0 left-0 w-full bg-blue-100 p-2 text-center print:hidden z-50 flex justify-center gap-4 items-center shadow-md">
-                        <span className="font-bold text-blue-900">Print Preview</span>
-                        <button onClick={() => window.print()} className="px-4 py-1.5 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 shadow transition-colors text-sm flex items-center gap-2">
-                            <span>🖨️</span> Print Now
-                        </button>
-                        <button onClick={() => { setIsPrintJob(false); setShowPrintModal(true); }} className="px-4 py-1.5 bg-gray-500 text-white rounded font-bold hover:bg-gray-600 shadow transition-colors text-sm">
-                            Close
-                        </button>
-                    </div>
-                )
-                }
+            {/* Actual Print Content (Visible only during print) */}
+            < div id="print-root" className={isPrintJob ? "block w-full font-serif text-sm bg-white" : "hidden print:block w-full font-serif text-sm bg-white"} >
 
                 {/* Mode A: Current Board */}
                 {
@@ -2911,7 +2972,7 @@ function App() {
                                     boardSize={boardSize}
                                     showCoordinates={printSettings?.showCoordinate ?? showCoordinates}
                                     showNumbers={printSettings?.showMoveNumber ?? showNumbers}
-                                    markers={history[currentMoveIndex]?.markers || []}
+                                    markers={currentState.markers || []}
                                     onCellClick={() => { }}
                                     onCellRightClick={() => { }}
                                     onBoardWheel={() => { }}
@@ -3070,6 +3131,18 @@ function App() {
                     )
                 }
             </div >
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-bold transition-opacity duration-300 ${
+                    toast.type === 'success' ? 'bg-green-600 text-white' :
+                    toast.type === 'error' ? 'bg-red-600 text-white' :
+                    'bg-blue-600 text-white'
+                }`}>
+                    {toast.message}
+                </div>
+            )}
+            <GlobalTooltip />
         </>
 
     );

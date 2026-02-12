@@ -21,16 +21,23 @@ body {
         -webkit-print-color-adjust: exact;
     }
 
-    /* Ensure the board is visible and centered */
-    .bg-white.shadow-lg.p-2.rounded.mb-4.w-full {
-        box-shadow: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
+    /* Ensure the print content is visible and takes full width */
+    #print-root {
+        display: none;
+    }
+
+    @media print {
+        #print-root {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Hide the main editor UI from the print output */
+        .print\:hidden {
+            display: none !important;
+        }
     }
 
     /* Maximize SVG size for print, but respect aspect ratio */
@@ -38,6 +45,7 @@ body {
         display: block;
         max-width: 100%;
         height: auto;
+        margin: 0 auto;
     }
 }
 

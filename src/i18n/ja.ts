@@ -22,12 +22,14 @@ export const ja = {
     'tooltip.showCaptured': 'エクスポート時に取られた石を表示: {status}',
     'tooltip.showNumbers': '手番号表示: {status}',
     'tooltip.pass': 'パス',
+    'tooltip.showNextMove': '次の一手候補を表示: {status}',
+    'tooltip.playbackSpeed': '再生速度',
 
     // Tooltips - Export
     'tooltip.copyAs': '{format}としてコピー (クリックでコピー)',
     'tooltip.savePng': 'PNGとして保存...',
     'tooltip.exportGif': 'GIFアニメーションとして保存...',
-    'tooltip.toggleFormat': 'エクスポート形式を切り替え (SVG/PNG)',
+    'tooltip.toggleFormat': 'エクスポート形式を切り替え (SVG/PNG/EMF)',
 
     // Tooltips - System
     'tooltip.openNewTab': '新しいタブで開く (最大化)',
@@ -65,11 +67,70 @@ export const ja = {
     'ui.monochrome': '白黒',
     'ui.branch': '分岐',
     'ui.exportingGif': 'GIF生成中...',
+    'ui.speedSlow': '低速',
+    'ui.speedNormal': '標準',
+    'ui.speedFast': '高速',
+    'ui.speedMax': '最速',
+
+    // Button Labels
+    'btn.new': '新規',
+    'btn.open': '開く',
+    'btn.save': '保存',
+    'btn.saveAs': '別名保存',
+    'btn.paste': '貼付',
+    'btn.info': '情報',
+    'btn.print': '印刷',
+    'btn.captured': '取石',
+    'btn.nextMove': '次の手',
+    'btn.numbers': '番号',
+    'btn.pass': 'パス',
+    'btn.copy': 'コピー',
+    'btn.savePng': 'PNG保存',
+    'btn.gif': 'GIF',
+    'btn.format': '形式',
+
+    // UI Labels (replacing hardcoded English)
+    'ui.coords': '座標',
+    'ui.boardSize': '盤サイズ',
+    'ui.startNumber': '開始番号',
+    'ui.copy': 'コピー',
+    'ui.zoom': '拡大',
+    'ui.reset': '戻す',
+    'ui.autoPlayStart': '自動再生',
+    'ui.autoPlayStop': '停止',
+
+    // Toast / Confirm
+    'alert.sgfOnly': 'SGFファイルのみ対応 (.sgf)',
+    'alert.gifFailed': 'GIF生成に失敗しました',
+    'alert.saveError': '保存エラー: ダウンロード権限を確認してください',
+    'confirm.clear': '盤面をクリアしますか？入力内容は失われます。',
+    'confirm.clearTitle': '盤面クリア',
+    'confirm.clearDesc': '現在の盤面と全ての入力内容が削除されます。この操作は取り消せません。',
+    'btn.cancel': 'キャンセル',
+    'btn.clearConfirm': 'クリア',
+    'alert.openError': 'ファイルを開けませんでした',
+    'alert.clipboardError': 'クリップボードへのコピーに失敗しました',
+    'alert.exportError': '画像の書き出しに失敗しました',
+    'alert.printError': '印刷ダイアログの表示に失敗しました',
+
+    // Hint lines (footer)
+    'hint.line1': '左クリック: 配置 / 右クリック: 削除',
+    'hint.line2': 'ダブルクリック: 色変更',
+    'hint.line3': 'ホイール: 手の進む/戻る',
+    'hint.line4': 'Ctrl+V: SGF貼り付け',
+
+    // Help Modal (new items)
+    'help.modeSwitch': 'モード切替',
+    'help.modeSwitchDesc': '●/○: 石を自由に配置 / ①: 手順を記録',
+    'help.fileOps': 'ファイル操作',
+    'help.fileOpsDesc': '📂で読み込み / 💾で上書き保存 / 📄で名前を付けて保存',
+    'help.printExport': '印刷・画像出力',
+    'help.printExportDesc': '🖨️で印刷 / 📷で画像コピー / ⬇️でPNG保存',
 
     // Help Modal
     'help.title': 'ショートカット & ヘルプ',
     'help.clickRightClick': 'クリック / 右クリック',
-    'help.clickDesc': '石を置く / 削除',
+    'help.clickDesc': 'クリックは黒、右クリックは白、石をクリックで削除',
     'help.drag': 'ドラッグ',
     'help.dragDesc': '範囲選択 (切り抜き) / 石の移動',
     'help.wheel': 'ホイール',
@@ -78,6 +139,24 @@ export const ja = {
     'help.copyDesc': '画像をクリップボードに保存',
     'help.sgfPaste': 'SGF貼り付け',
     'help.sgfPasteDesc': 'クリップボードから棋譜を読み込み',
+    'help.shortcuts': 'キーボードショートカット',
+    'help.shortcutNew': '新規/クリア',
+    'help.shortcutOpen': 'ファイルを開く',
+    'help.shortcutSave': '名前を付けて保存',
+    'help.shortcutCopySgf': 'SGFをコピー',
+    'help.shortcutCopyImg': '画像をコピー',
+    'help.shortcutPaste': 'SGF貼り付け',
+    'help.shortcutPrint': '印刷',
+    'help.shortcutUndo': '削除 (Undo)',
+    'help.shortcutRedo': '復元 (Redo)',
+    'help.shortcutNav': '手の戻る/進む',
+    'help.shortcutDelete': '最後の手を削除',
+
+    // About
+    'about.author': '制作: 三村智保 九段',
+    'about.blog': '三村囲碁JP',
+    'about.youtube': 'YouTube',
+    'about.dojo': '市川こども囲碁道場',
 
     // === GameInfoModal.tsx ===
     'gameInfo.title': '対局情報',
@@ -111,8 +190,8 @@ export const ja = {
     'print.title': '印刷設定',
     'print.pageSettings': 'ページ設定',
     'print.currentBoard': '現在の盤面を印刷',
-    'print.wholeFileMoves': '棋譜全体 ("設定手数"で分割)',
-    'print.wholeFileFigure': '棋譜全体 (手数指定で分割)',
+    'print.wholeFileMoves': '棋譜全体 ("設定手数"で譜分け)',
+    'print.wholeFileFigure': '棋譜全体 (手数指定で譜分け)',
     'print.movesPerFigure': '1図あたりの手数',
     'print.options': 'オプション',
     'print.showMarkers': 'マーカーを表示',

@@ -320,8 +320,8 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                     <g key={`s-group-${x}-${y}`} className="pointer-events-none">
                         <circle
                             cx={cx} cy={cy} r={STONE_RADIUS}
-                            fill={isBlack ? "black" : "white"}
-                            stroke={isBlack ? "black" : "black"}
+                            fill={isBlack ? "#000000" : "#FFFFFF"}
+                            stroke={isBlack ? "#000000" : "#000000"}
                             strokeWidth={isBlack ? 2 : 2.0}
                             className={isBlack ? "black-stone" : "white-stone"}
                         // Removed crispEdges from stones for smoothness
@@ -331,11 +331,12 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                                 x={cx} y={cy}
                                 dy=".35em"
                                 textAnchor="middle"
-                                fill={isBlack ? "white" : "black"}
+                                fill={isBlack ? "#FFFFFF" : "#000000"}
                                 fontSize={(displayText && displayText.length >= 3) ? CELL_SIZE * 0.45 : FONT_SIZE}
                                 fontFamily="Arial, sans-serif"
                                 fontWeight="bold"
                                 style={{ WebkitFontSmoothing: 'none', fontSmooth: 'never' } as any}
+                                className="board-marker"
                             >
                                 {displayText}
                             </text>
@@ -368,6 +369,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                         fontFamily="Arial, sans-serif"
                         fontWeight="bold"
                         style={{ pointerEvents: 'none', userSelect: 'none' } as React.CSSProperties}
+                        className="board-marker"
                     >
                         {m.value}
                     </text>
@@ -375,16 +377,16 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             } else if (m.type === 'SYMBOL') {
                 const r = CELL_SIZE * 0.25;
                 if (m.value === 'SQR') {
-                    markerElements.push(<rect key={`mk-sym-${i}`} x={cx - r} y={cy - r} width={r * 2} height={r * 2} stroke={baseColor} strokeWidth={2} fill="none" pointerEvents="none" />);
+                    markerElements.push(<rect key={`mk-sym-${i}`} x={cx - r} y={cy - r} width={r * 2} height={r * 2} stroke={baseColor} strokeWidth={2} fill="none" pointerEvents="none" className="board-marker" />);
                 } else if (m.value === 'TRI') {
                     const points = `${cx},${cy - r} ${cx + r * 0.866},${cy + r * 0.5} ${cx - r * 0.866},${cy + r * 0.5}`;
-                    markerElements.push(<polygon key={`mk-sym-${i}`} points={points} stroke={baseColor} strokeWidth={2} fill="none" pointerEvents="none" />);
+                    markerElements.push(<polygon key={`mk-sym-${i}`} points={points} stroke={baseColor} strokeWidth={2} fill="none" pointerEvents="none" className="board-marker" />);
                 } else if (m.value === 'CIR') {
-                    markerElements.push(<circle key={`mk-sym-${i}`} cx={cx} cy={cy} r={r} stroke={baseColor} strokeWidth={2} fill="none" pointerEvents="none" />);
+                    markerElements.push(<circle key={`mk-sym-${i}`} cx={cx} cy={cy} r={r} stroke={baseColor} strokeWidth={2} fill="none" pointerEvents="none" className="board-marker" />);
                 } else if (m.value === 'X') {
                     const d = r * 0.8;
                     markerElements.push(
-                        <g key={`mk-sym-${i}`} stroke={baseColor} strokeWidth={2} pointerEvents="none">
+                        <g key={`mk-sym-${i}`} stroke={baseColor} strokeWidth={2} pointerEvents="none" className="board-marker">
                             <line x1={cx - d} y1={cy - d} x2={cx + d} y2={cy + d} />
                             <line x1={cx + d} y1={cy - d} x2={cx - d} y2={cy + d} />
                         </g>
@@ -477,7 +479,6 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             ))}
 
             {cells}
-            {markerElements}
 
             {/* Ghost Stones for Branches */}
             {!readOnly && nextMoves.map((move) => {
@@ -505,12 +506,13 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                             opacity={0.5}
                         />
                         {/* Optional: Add a small marker to indicate it's a branch? */}
-                        <circle cx={cx} cy={cy} r={3} fill={isBlack ? "white" : "black"} opacity={0.8} />
+                        <circle cx={cx} cy={cy} r={3} fill={isBlack ? "#FFFFFF" : "#000000"} opacity={0.8} />
                     </g>
                 );
             })}
 
             {selectionRect}
+            {markerElements}
 
             {/* Footer Text for Hidden Moves */}
             {hiddenMoves.length > 0 && (() => {

@@ -169,4 +169,37 @@
         - ユーザーより「v2.0.1 は既に公開済み」との指摘があったため、バージョン競合を避け、かつ確実に表示不具合を解消するために **v2.0.2** へ更新しました。
         - 変更点はバージョン番号の更新のみです。再ビルドにより正しいバージョン表記(v2.0.2)がサイドバーに表示されることを保証します。
 
+- **2026-01-26**:
+    - **[Feature] Printing Overhaul (v2.0.5)**:
+        - **Direct Print**: 印刷ボタン押下時に新しいタブを開かず、サイドバー内で完結するように変更しました。
+        - **No Preview Page**: プレビュー用のモード切り替え（ヘッダー表示等）を廃止し、エディタ画面からダイレクトに Windows 印刷ダイアログが開くように改良しました。
+        - **Terminology Fix**: 「分割」という表現を、棋譜の慣用表現である「**譜分け**」に統一しました。
+        - **Stability**: 印刷ダイアログ表示時に石が表示されない（白紙になる）問題を、描画同期とCSSメディアクエリの最適化により修正しました。
+        - **Repository**: リポジトリのURLを最新（`igomimu/go-rewrite`）に追従しました。
+
+- **2026-01-27**:
+    - **[Investigation] Word SVG 白黒反転問題の調査**:
+        - **現象**: GORewriteからWordへSVGを貼り付け、保存→再オープンすると黒石と白石の色が反転する。
+        - **調査内容**:
+            - SVGファイルを直接分析 → 全ての色が正しいHEXコード (`#000000`, `#FFFFFF`) で出力されていることを確認。
+            - クリップボード経由とファイル直接挿入の両方でテスト → **どちらも反転**。
+            - Microsoft公式ドキュメントおよびWeb調査 → **WordのSVGサポートは不完全であり、既知のバグ**であることを確認。
+        - **結論**: **GORewriteには問題がない。Microsoft WordのSVGレンダリングバグが原因。**
+        - **GOWriteとの比較**:
+            - GOWriteはデスクトップアプリ（Java）であり、**EMF/WMF形式**（Windowsネイティブベクター）でクリップボードにコピーするため、Wordで問題が発生しない。
+            - Macでもクリップボードには**ビットマップ形式**を使用しており、SVGバグを回避している。
+            - GORewriteは**ブラウザ拡張**であり、Web標準のSVG/PNGのみ使用可能。EMF/WMF生成はブラウザAPIの制限により不可能。
+        - **技術的限界**: ブラウザ拡張という技術基盤では、WordへのEMF直接出力は実装不可能。これはプラットフォームの根本的な制約。
+        - **推奨ワークフロー**:
+            - **Word印刷用途**: GOWriteの使用を推奨。
+            - **GORewriteの強み**: SGF編集、Web公開用SVG出力、他のSVG対応アプリへの出力。
+
+    - **[Fix] Restore SVG Export & Word Compatibility (v2.0.6)**:
+        - **Strategy Shift**: Previous "Aggressive Color Offset" failed because Word's XML parser misinterpreted `<style>` blocks and applied dark mode inversion anyway.
+        - **Current Solution**: **Flat DOM + Aggressive Offset**.
+            - **Flat DOM**: Completely removed internal `<style>` tags, classes, and media queries from the exported SVG.
+            - **Attributes**: Converted all styling to inline attributes (`fill="..."`) which act as a "hard override" for Word.
+            - **Colors**: Maintained `#121212` / `#ECECEC`.
+            - **Hypothesis**: By removing the "intelligence" (CSS) from the SVG, we force Word to simply render the attributes as-is.
+
 
