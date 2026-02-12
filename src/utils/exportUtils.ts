@@ -200,7 +200,7 @@ export async function exportToEmf(svgElement: SVGSVGElement, options: { backgrou
             alert('EMF Export failed: ' + error.message);
         }
     } else {
-        alert('EMF Export is only supported in the desktop version (GORewrite Desktop).');
+        alert('EMF Export is only supported in the desktop version (SnapGoban Desktop).');
     }
 }
 
@@ -213,7 +213,7 @@ export async function saveFile(blob: Blob, filename: string, typeDescription: st
     if ('showSaveFilePicker' in window) {
         try {
             const pickerOptions: any = {
-                id: 'gorewrite-export',
+                id: 'snapgoban-export',
                 types: [{
                     description: typeDescription,
                     accept: { [mimeType]: ['.' + (filename ? filename.split('.').pop() : (mimeType.includes('png') ? 'png' : (mimeType.includes('gif') ? 'gif' : 'svg')))] }
@@ -274,7 +274,7 @@ export async function promptSaveFile(mimeType: string, filename: string): Promis
     try {
         const typeDescription = mimeType.split('/')[1].toUpperCase() + ' File';
         const pickerOptions: any = {
-            id: 'gorewrite-export',
+            id: 'snapgoban-export',
             types: [{ description: typeDescription, accept: { [mimeType]: ['.' + (filename ? filename.split('.').pop() : (mimeType.includes('png') ? 'png' : (mimeType.includes('gif') ? 'gif' : 'svg')))] } }]
         };
         if (filename) pickerOptions.suggestedName = filename;

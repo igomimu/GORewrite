@@ -1,4 +1,4 @@
-// GORewrite i18n - Core module
+// SnapGoban i18n - Core module
 
 import { useState, useCallback, createContext, useContext, ReactNode } from 'react';
 import { ja, TranslationKey } from './ja';

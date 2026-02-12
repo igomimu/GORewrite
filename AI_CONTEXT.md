@@ -1,30 +1,33 @@
-# GORewrite Project Charter for AI Agents
+# SnapGoban Project Charter for AI Agents
+
+(Formerly known as GORewrite)
 
 ## 1. Project Core Purpose
-**GORewrite is a tool dedicated to creating high-quality Go materials for PRINT and PUBLISHING.**
-The primary user base consists of authors and instructors creating books and handouts using Microsoft Word and other DTP software.
-**Therefore, vector quality (SVG) and compatibility with Office apps are PARAMOUNT.**
+**SnapGoban is a browser-based tool for viewing, editing, printing, and exporting Go game records (SGF).** It serves all Go enthusiasts — from casual players reviewing games to authors creating diagrams for publications.
 
-## THE ULTIMATE CHALLENGE: SVG Copy/Paste to Word
-- **Current Status**: This is the single biggest blocker for the project.
-- **Problem**: Pasting SVG directly into Microsoft Word consistently results in color inversion (Black stones become White), rendering diagrams unusable.
-- **History**: This issue has **NEVER been fully solved** despite multiple attempts. It is a known difficulty with Word's SVG rendering engine.
-- **MANDATE**: **DO NOT GIVE UP.** Achieving perfect SVG copy/paste compatibility with Word is the **FINAL GOAL** of this project. Even if it requires complex hacks (off-peak colors, EMF wrapping, etc.), we must find a way.
+## 2. Key Features
+- **SGF Full Support**: Load, edit, save, and branch SGF files.
+- **Beautiful Board Rendering**: Realistic stones, wood texture, and monochrome mode.
+- **Printing**: Professional-quality kifu printing with headers, footers, and figure splitting.
+- **Image Export**: PNG, SVG, and GIF export with cropping and legend support.
+- **Branching / Variations**: Full tree navigation with ghost stones and branch selector UI.
 
-## 2. Critical Directives for AI
-- **NEVER Remove Core Features**: If a feature (like SVG export) has bugs in third-party apps (e.g., Word), allow the user to decide. Do not unilaterally remove functionality.
-- **Printing is Priority**: Web features (pasting to blogs, etc.) are secondary. If a trade-off exists, optimize for Print/Word.
-- **Dual-Track Strategy**:
-    - **Web Extension**: For general use. SVG compatible with standard web tools. Word compatibility is "Best Effort".
-    - **Desktop App (Planned)**: For DTP/Professional use. Will support native **EMF export** to solve Word issues 100%.
-- **SVG Issue & Solution (Web Track)**:
-    - **Issue**: Standard SVGs with styles/classes/media-queries confuse Word's parser, causing inversion.
-    - **Solution**: **Flat DOM + Aggressive Offset**.
-        1. **Flat DOM**: Remove ALL `<style>` tags, classes, and media queries. Use inline attributes only.
-        2. **Color Offset**: Use `#121212` (Black) and `#ECECEC` (White) to evade auto-inversion.
-    - **Action**: Maintain this structure for Web. Do not introduce `<style>`. For perfect Word support, push Desktop App.
+## 3. Known Limitations
+- **SVG in Microsoft Word**: Word's SVG rendering has known issues (color inversion). Current mitigation uses Flat DOM + Aggressive Color Offset (`#121212` / `#ECECEC`). For perfect Word compatibility, EMF export would be needed (not possible in browser extensions).
+- **Recommendation**: For Word/DTP workflows, use GOWrite (desktop app). SnapGoban excels at web publishing, direct printing, and image export.
 
-## 3. Project Structure
+## 4. Critical Directives for AI
+- **NEVER Remove Core Features**: If a feature has bugs in third-party apps, allow the user to decide.
+- **Balance**: Web publishing, direct printing, and image export are all equally important.
+- **SVG Export Strategy**: Maintain Flat DOM (no `<style>` tags, inline attributes only) for maximum compatibility.
+
+## 5. Project Structure
 - **Frontend**: React + Vite (Browser Extension)
 - **State**: `App.tsx` manages main state.
-- **Export**: `src/utils/exportUtils.ts` handles all SVG/PNG generation logic, including the color hacks.
+- **Export**: `src/utils/exportUtils.ts` handles all SVG/PNG generation logic.
+- **i18n**: `src/i18n/` — Japanese (default), English, Chinese.
+
+## 6. Brand
+- **Name**: SnapGoban (スナップ碁盤)
+- **Message (JA)**: 碁盤をパシャッと。棋譜の閲覧・編集・印刷・画像出力をブラウザで手軽に。
+- **Message (EN)**: Snap your Go board. View, edit, print, and export game records — right in your browser.

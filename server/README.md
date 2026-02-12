@@ -1,6 +1,6 @@
 # KataGo Bridge Server
 
-GORewrite Chrome拡張機能とKataGoを接続するブリッジサーバー。
+SnapGoban（旧 GORewrite）Chrome拡張機能とKataGoを接続するブリッジサーバー。
 
 ## セットアップ
 

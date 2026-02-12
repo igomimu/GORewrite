@@ -175,6 +175,47 @@ function App() {
     const [showOwnership, setShowOwnership] = useState(false);
     const [hoveredAnalysisMove, setHoveredAnalysisMove] = useState<SuggestedMove | null>(null);
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+    const [analysisCache, setAnalysisCache] = useState<Map<string, { blackWinrate: number; scoreLead: number }>>(new Map());
+
+    // Store analysis results in cache when they arrive
+    useEffect(() => {
+        if (analysisResult && currentNodeId) {
+            const blackWinrate = analysisResult.currentPlayer === 'B'
+                ? analysisResult.winrate
+                : 100 - analysisResult.winrate;
+            const scoreLead = analysisResult.currentPlayer === 'B'
+                ? analysisResult.scoreLead
+                : -analysisResult.scoreLead;
+
+            setAnalysisCache(prev => {
+                const newCache = new Map(prev);
+                newCache.set(currentNodeId, { blackWinrate, scoreLead });
+                return newCache;
+            });
+        }
+    }, [analysisResult, currentNodeId]);
+
+    // Build winrate history from analyzed positions
+    const winrateHistory = useMemo(() => {
+        return history.map((node, index) => {
+            const cached = analysisCache.get(node.id);
+            const isAnalyzed = cached !== undefined;
+
+            return {
+                moveNumber: index,
+                nodeId: node.id,
+                blackWinrate: cached?.blackWinrate ?? 50,
+                scoreLead: cached?.scoreLead ?? 0,
+                playedMove: node.move ? `${String.fromCharCode(64 + node.move.x)}${19 - node.move.y + 1}` : undefined,
+                isAnalyzed,
+            };
+        });
+    }, [history, analysisCache]);
+
+    // Handle graph move click - navigate to that position
+    const handleGraphMoveClick = useCallback((_moveNumber: number, nodeId: string) => {
+        setCurrentNodeId(nodeId);
+    }, []);
 
     // Auto-analyze when position changes
     useEffect(() => {
@@ -941,7 +982,54 @@ function App() {
 
 
 
-    // Print Job Initialization removed (Moved to handlePrintRequest direct flow)
+    // Print Job Initialization
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('print_job') === 'true') {
+            setIsPrintJob(true);
+            const sgf = localStorage.getItem('gorw_temp_print_sgf');
+            const settingsStr = localStorage.getItem('gorw_temp_print_settings');
+
+            if (sgf && settingsStr) {
+                if (sgf.length > 20) {
+                    try {
+                        loadSGF(sgf);
+                        const savedIndex = localStorage.getItem('gorw_temp_print_index');
+                        if (savedIndex !== null) {
+                            const idx = parseInt(savedIndex, 10);
+                            let node = rootNode;
+                            for (let i = 0; i < idx; i++) {
+                                if (node.children.length > 0) node = node.children[0];
+                            }
+                            setCurrentNodeId(node.id);
+                        }
+                    } catch (e) {
+                        alert("Failed to load SGF data: " + e);
+                    }
+                }
+                setPrintSettings(JSON.parse(settingsStr));
+
+                // Set title
+                document.title = "Print Preview - SnapGoban";
+
+                const triggerPrint = () => {
+                    try {
+                        window.focus();
+                        window.print();
+                    } catch (e) {
+                        console.warn("Auto-print failed", e);
+                    }
+                };
+
+                // Auto-print with delay to ensure rendering
+                if (document.readyState === 'complete') {
+                    setTimeout(triggerPrint, 800);
+                } else {
+                    window.addEventListener('load', () => setTimeout(triggerPrint, 800), { once: true });
+                }
+            }
+        }
+    }, []);
 
     const loadSGF = (content: string) => {
         const { board: initialBoard, size, metadata, root: sgfRoot } = parseSGFTree(content);
@@ -1871,26 +1959,42 @@ function App() {
     };
 
     const handlePrintRequest = (settings: PrintSettings) => {
-        // 譜分け（Fu-wake）印刷 または 通常印刷の開始
-
-        flushSync(() => {
-            setPrintSettings(settings);
-            setShowPrintModal(false);
-            setIsPrintJob(true); // 印刷用コンテンツの生成
-        });
-
-        // 描画とメディアクエリの適用を確実にするため、短めのタイマーで実行
-        // 100ms はユーザーのジェスチャ（クリック）として認識される限界に近い安全圏
-        setTimeout(() => {
-            try {
-                window.focus();
-                window.print();
-            } catch (e) {
-                console.error("Print dialog failed", e);
+        // Calculate Full History SGF if needed
+        let sgf;
+        if (settings.pagingType === 'WHOLE_FILE_FIGURE' || settings.pagingType === 'WHOLE_FILE_MOVE') {
+            // Traverse from Root to Leaf (Main Line from current split?)
+            // Usually Whole File means "The entire loaded game".
+            // Since we can't easily guess which branch, we use the current branch extended to leaf.
+            // But we need to start from ROOT.
+            let leaf = history[history.length - 1];
+            while (leaf.children && leaf.children.length > 0) {
+                leaf = leaf.children[0];
             }
-            // 印刷後はフラグを下ろす（隠しコンテナを空にする）
-            setIsPrintJob(false);
-        }, 100);
+
+            // Reconstruct path from ROOT to Leaf
+            // history[0] is root.
+            sgf = getSGFString();
+        } else {
+            sgf = getSGFString();
+        }
+
+        // Side Panel Workaround: Open in new tab to print
+        localStorage.setItem('gorw_temp_print_sgf', sgf);
+        localStorage.setItem('gorw_temp_print_settings', JSON.stringify(settings));
+        localStorage.setItem('gorw_temp_print_index', currentMoveIndex.toString());
+
+        // Open new tab (relative path to index.html)
+        const printWindow = window.open('index.html?print_job=true', '_blank');
+        if (!printWindow) {
+            flushSync(() => {
+                setPrintSettings(settings);
+                setShowPrintModal(false);
+            });
+            window.print();
+            return;
+        }
+
+        setShowPrintModal(false);
     };
 
 
@@ -2244,7 +2348,7 @@ function App() {
     return (
         <>
             <div
-                className={`p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none relative ${isDragging ? 'bg-blue-50 outline outline-4 outline-blue-400 outline-offset-[-4px]' : ''} print:hidden`}
+                className={`p-4 bg-gray-100 min-h-screen flex flex-col items-center font-sans text-sm pb-20 select-none relative ${isDragging ? 'bg-blue-50 outline outline-4 outline-blue-400 outline-offset-[-4px]' : ''} ${isPrintJob ? '!hidden' : ''}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -2500,7 +2604,7 @@ function App() {
                             </div>
                         </div>
                         <div className="mt-6 text-center text-xs text-gray-400">
-                            GORewrite {displayVersion}
+                            SnapGoban {displayVersion}
                         </div>
                     </div>
                 )}
@@ -2656,6 +2760,9 @@ function App() {
                             showOwnership={showOwnership}
                             maxVisits={maxVisits}
                             onMaxVisitsChange={(visits) => setMaxVisits(visits)}
+                            winrateHistory={winrateHistory}
+                            currentMoveNumber={currentMoveIndex}
+                            onGraphMoveClick={handleGraphMoveClick}
                         />
                     </div>
                 )}
@@ -3017,23 +3124,22 @@ function App() {
                                         // Dynamic resizing for high density (3 Rows: 5 or 6 items)
                                         if (count >= 5) {
                                             // 3 rows need to fit.
-                                            // Safe limit: 260px.
-                                            return { width: '90%', maxWidth: '260px' };
+                                            // Safe limit: 286px (+10%).
+                                            return { width: '90%', maxWidth: '286px' };
                                         }
                                         // 2 Rows (3 or 4 items)
-                                        // 480px was too large for some margins (960px height).
-                                        // Reduced to 400px (800px height) to be safe.
-                                        return { width: '95%', maxWidth: '400px' };
+                                        // 440px (+10% from 400px).
+                                        return { width: '95%', maxWidth: '440px' };
                                     }
 
                                     // Single Column (1 item or Vertical Stack)
                                     if (count === 2 && layout === 'AUTO') {
                                         // Vertical Stack: Limits are vertical mostly
-                                        return { width: '60%', maxWidth: '550px' };
+                                        return { width: '60%', maxWidth: '605px' };
                                     }
 
                                     // Default Single
-                                    return { width: '90%', maxWidth: '800px' };
+                                    return { width: '90%', maxWidth: '880px' };
                                 };
 
                                 return chunks.map((chunk, pageIdx) => {

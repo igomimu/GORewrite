@@ -72,7 +72,7 @@ export interface AnalysisState {
 
 // UI用の変換済み推奨手情報
 export interface SuggestedMove {
-  x: number;              // GORewrite座標 (1-indexed)
+  x: number;              // SnapGoban座標 (1-indexed)
   y: number;
   rank: number;           // 1 = best
   winrate: number;        // 0-100 percentage
@@ -94,4 +94,15 @@ export interface AnalysisResult {
   visits: number;
   suggestedMoves: SuggestedMove[];
   ownership?: OwnershipData;
+}
+
+// 勝率履歴（グラフ表示用）
+export interface WinrateHistoryEntry {
+  moveNumber: number;     // 手数
+  nodeId: string;         // GameNodeのID
+  blackWinrate: number;   // 黒の勝率 (0-100)
+  scoreLead: number;      // 黒から見たスコアリード
+  bestMove?: string;      // 最善手
+  playedMove?: string;    // 実際に打たれた手
+  isAnalyzed: boolean;    // 分析済みかどうか
 }

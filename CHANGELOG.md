@@ -1,5 +1,13 @@
 # Changelog
- 
+
+## [3.0.0] - 2026-02-11
+### Changed
+- **Rebranding**: GORewrite → **SnapGoban**（スナップ碁盤）に名称変更。
+- **Version**: v2.0.6 → v3.0.0（新章として明示）。
+- **Brand Message**: 「碁盤をパシャッと。棋譜の閲覧・編集・印刷・画像出力をブラウザで手軽に。」
+- **Target Audience**: 教育者・著者特化 → 囲碁愛好家全般へ拡大。
+- **AI_CONTEXT.md**: プロジェクトチャーターを全面書き換え。Word SVGへの執着を緩和し、Web/印刷/画像出力をバランスよく位置付け。
+
 ## [2.0.6] - 2026-01-30
 ### Added
 - **GIF Export & Auto-Play**: Restored GIF export feature and added playback speed control (Slow/Normal/Fast/Max).

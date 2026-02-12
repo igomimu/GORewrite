@@ -1,4 +1,6 @@
 # Global Memory
+
+> **Note (2026-02-11)**: このプロジェクトは **GORewrite** から **SnapGoban**（スナップ碁盤）に名称変更されました (v3.0.0)。以下の過去ログ内の「GORewrite」はそのまま歴史的記録として残しています。
 - **Reading Records**: Stored in `C:/Users/lucky/OneDrive/Super-Data-Station/Books` (Markdown format). Always check here for book queries.
 
 # 2025-12-19

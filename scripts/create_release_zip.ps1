@@ -10,8 +10,8 @@
 
 $manifestPath = "public\manifest.json"
 $constantsPath = "src\constants.ts"
-$releaseVersion = "2.0.1"
-$zipName = "GORewrite-v$releaseVersion.zip"
+$releaseVersion = "3.0.0"
+$zipName = "SnapGoban-v$releaseVersion.zip"
 
 Write-Host "📦 Creating Release ZIP for v$releaseVersion..." -ForegroundColor Cyan
 Write-Host ""
@@ -28,11 +28,11 @@ $manifestContent = Get-Content $manifestPath -Raw | ConvertFrom-Json
 $originalName = $manifestContent.name
 Write-Host "📌 Current Name: $originalName" -ForegroundColor Gray
 
-$manifestContent.name = "GORewrite"
+$manifestContent.name = "SnapGoban"
 $manifestContent.version = $releaseVersion
 
 $manifestContent | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding UTF8
-Write-Host "✅ manifest.json switched to Production (Name: GORewrite, Version: $releaseVersion)" -ForegroundColor Green
+Write-Host "✅ manifest.json switched to Production (Name: SnapGoban, Version: $releaseVersion)" -ForegroundColor Green
 
 # 3. Build
 Write-Host ""

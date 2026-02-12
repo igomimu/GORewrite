@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-KataGo Bridge Server for GORewrite Chrome Extension
+KataGo Bridge Server for SnapGoban Chrome Extension
 Flask + WebSocket server that communicates with KataGo analysis engine
 """
 
@@ -44,7 +44,9 @@ class KataGoManager:
         self.response_callbacks: Dict[str, queue.Queue] = {}
         self.lock = threading.Lock()
         self.reader_thread: Optional[threading.Thread] = None
+        self.stderr_thread: Optional[threading.Thread] = None
         self.is_running = False
+        self.is_ready = False
 
     def start(self) -> bool:
         """Start KataGo analysis engine"""
@@ -66,15 +68,25 @@ class KataGoManager:
             )
 
             self.is_running = True
+            self.is_ready = False
             self.reader_thread = threading.Thread(target=self._read_responses, daemon=True)
             self.reader_thread.start()
+            self.stderr_thread = threading.Thread(target=self._read_stderr, daemon=True)
+            self.stderr_thread.start()
 
-            # Wait a bit to check if process started successfully
-            time.sleep(0.5)
-            if self.process.poll() is not None:
-                stderr = self.process.stderr.read() if self.process.stderr else ""
-                print(f"KataGo failed to start: {stderr}", file=sys.stderr)
-                self.is_running = False
+            # Wait for KataGo to be ready (up to 30 seconds)
+            for _ in range(60):
+                time.sleep(0.5)
+                if self.is_ready:
+                    break
+                if self.process.poll() is not None:
+                    print(f"KataGo process exited unexpectedly", file=sys.stderr)
+                    self.is_running = False
+                    return False
+
+            if not self.is_ready:
+                print(f"KataGo did not become ready in time", file=sys.stderr)
+                self.stop()
                 return False
 
             print(f"KataGo started successfully")
@@ -160,6 +172,30 @@ class KataGoManager:
                 break
 
         print("KataGo reader thread stopped")
+
+    def _read_stderr(self):
+        """Background thread to read KataGo stderr (logs)"""
+        while self.is_running and self.process and self.process.stderr:
+            try:
+                line = self.process.stderr.readline()
+                if not line:
+                    if self.process.poll() is not None:
+                        break
+                    continue
+
+                line = line.strip()
+                if line:
+                    print(f"[KataGo] {line}")
+                    # Check if KataGo is ready
+                    if "ready to begin handling requests" in line.lower():
+                        self.is_ready = True
+
+            except Exception as e:
+                if self.is_running:
+                    print(f"Error reading KataGo stderr: {e}", file=sys.stderr)
+                break
+
+        print("KataGo stderr thread stopped")
 
 
 # Global KataGo manager

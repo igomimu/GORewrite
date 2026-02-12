@@ -1,7 +1,8 @@
 // AI検討パネルコンポーネント
 import { useState, useCallback } from 'react';
-import { AnalysisResult, SuggestedMove, StoneColorKG } from '../types/katago';
+import { AnalysisResult, SuggestedMove, StoneColorKG, WinrateHistoryEntry } from '../types/katago';
 import { formatWinrate, formatScoreLead } from '../utils/katagoUtils';
+import WinrateGraph from './WinrateGraph';
 
 interface AnalysisPanelProps {
   isConnected: boolean;
@@ -19,6 +20,10 @@ interface AnalysisPanelProps {
   showOwnership?: boolean;
   maxVisits: number;
   onMaxVisitsChange: (visits: number) => void;
+  // 勝率グラフ用
+  winrateHistory?: WinrateHistoryEntry[];
+  currentMoveNumber?: number;
+  onGraphMoveClick?: (moveNumber: number, nodeId: string) => void;
 }
 
 export default function AnalysisPanel({
@@ -37,6 +42,9 @@ export default function AnalysisPanel({
   showOwnership = false,
   maxVisits,
   onMaxVisitsChange,
+  winrateHistory = [],
+  currentMoveNumber = 0,
+  onGraphMoveClick,
 }: AnalysisPanelProps) {
   const [hoveredMoveIndex, setHoveredMoveIndex] = useState<number | null>(null);
 
@@ -193,6 +201,14 @@ export default function AnalysisPanel({
               </span>
             </div>
           </div>
+
+          {/* 勝率推移グラフ */}
+          <WinrateGraph
+            history={winrateHistory}
+            currentMoveNumber={currentMoveNumber}
+            onMoveClick={onGraphMoveClick}
+            height={100}
+          />
 
           {/* スコアリード */}
           <div className="text-center text-sm">

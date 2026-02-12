@@ -1,7 +1,7 @@
 {
   "katago_path": "C:/Users/lucky/Documents/LizzieYzy-2.5.9/katago-v1.16.4-eigenavx2-windows-x64/katago.exe",
   "model_path": "C:/Users/lucky/Documents/LizzieYzy-2.5.9/weights/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz",
-  "config_path": "",
+  "config_path": "C:/Users/lucky/Documents/LizzieYzy-2.5.9/katago-v1.16.4-eigenavx2-windows-x64/analysis_example.cfg",
   "default_rules": "japanese",
   "default_komi": 6.5,
   "default_max_visits": 100,

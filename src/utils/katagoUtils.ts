@@ -15,7 +15,7 @@ import {
 const GTP_LETTERS = 'ABCDEFGHJKLMNOPQRST';
 
 /**
- * GORewrite座標 (1-indexed, 左上が(1,1)) からGTP座標へ変換
+ * SnapGoban座標 (1-indexed, 左上が(1,1)) からGTP座標へ変換
  * 例: (1, 1, 19) => "A19", (4, 4, 19) => "D16"
  */
 export function toGtpCoord(x: number, y: number, boardSize: number): string {
@@ -28,7 +28,7 @@ export function toGtpCoord(x: number, y: number, boardSize: number): string {
 }
 
 /**
- * GTP座標からGORewrite座標へ変換
+ * GTP座標からSnapGoban座標へ変換
  * 例: ("A19", 19) => {x: 1, y: 1}, ("D16", 19) => {x: 4, y: 4}
  */
 export function fromGtpCoord(gtp: string, boardSize: number): { x: number; y: number } | null {
@@ -52,14 +52,14 @@ export function fromGtpCoord(gtp: string, boardSize: number): { x: number; y: nu
 }
 
 /**
- * GORewriteの色をKataGo形式に変換
+ * SnapGobanの色をKataGo形式に変換
  */
 export function toKataGoColor(color: StoneColor): StoneColorKG {
   return color === 'BLACK' ? 'B' : 'W';
 }
 
 /**
- * KataGoの色をGORewrite形式に変換
+ * KataGoの色をSnapGoban形式に変換
  */
 export function fromKataGoColor(color: StoneColorKG): StoneColor {
   return color === 'B' ? 'BLACK' : 'WHITE';

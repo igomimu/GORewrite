@@ -1,4 +1,4 @@
-// GORewrite i18n - English translations
+// SnapGoban i18n - English translations
 
 import { TranslationKey } from './ja';
 

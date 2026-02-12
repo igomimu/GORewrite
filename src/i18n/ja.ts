@@ -1,4 +1,4 @@
-// GORewrite i18n - Japanese translations (default)
+// SnapGoban i18n - Japanese translations (default)
 
 export const ja = {
     // === App.tsx ===

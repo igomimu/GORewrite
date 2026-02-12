@@ -1,7 +1,7 @@
 import { BoardState, StoneColor } from "../components/GoBoard";
 
 /*
-  Simple SGF Generator/Parser for GORewrite.
+  Simple SGF Generator/Parser for SnapGoban.
   Focuses on:
   1. AB[...], AW[...] for stone placement.
   2. LB[...] for numbered stones in diagram mode.
@@ -294,7 +294,7 @@ export function parseSGF(sgfContent: string): ParsedSGF {
                     stone.number = num;
                 }
                 // If labeling an empty spot?
-                // GORewrite supports numbered stones. Does it support numbered empty spots?
+                // SnapGoban supports numbered stones. Does it support numbered empty spots?
                 // Code: `if (stone) { ... {stone.number} ... }`.
                 // So we can only label stones. Ignoring empty labels for now.
             }
@@ -471,24 +471,57 @@ export function parseSGFTree(sgfContent: string): ParsedSGFTree {
     // Parse from after the first (
     let parsePos = startIdx + 1;
 
-    // Skip the root node properties (;GM[1]FF[4]SZ[19]...)
+    // Skip to the first ;
     while (parsePos < sgfContent.length && sgfContent[parsePos] !== ';') parsePos++;
     if (parsePos < sgfContent.length) parsePos++; // Skip first ;
 
-    // Skip root properties
-    while (parsePos < sgfContent.length &&
-        sgfContent[parsePos] !== ';' &&
-        sgfContent[parsePos] !== '(' &&
-        sgfContent[parsePos] !== ')') {
-        parsePos++;
+    // Find end of root properties (content after first ;)
+    let rootPropsEnd = parsePos;
+    while (rootPropsEnd < sgfContent.length &&
+        sgfContent[rootPropsEnd] !== ';' &&
+        sgfContent[rootPropsEnd] !== '(' &&
+        sgfContent[rootPropsEnd] !== ')') {
+        rootPropsEnd++;
     }
+
+    // Extract root properties and check for move in root node
+    // This handles SGFs where first move is in root node: (;...B[pd];W[dd]...)
+    const rootProps = sgfContent.substring(parsePos, rootPropsEnd);
+    const rootBMatch = rootProps.match(/B\[([a-zA-Z]*)\]/);
+    const rootWMatch = rootProps.match(/W\[([a-zA-Z]*)\]/);
+
+    let firstMoveNode: SgfTreeNode | null = null;
+
+    if (rootBMatch || rootWMatch) {
+        // First move is in root node - create a node for it
+        firstMoveNode = { children: [] };
+        const match = rootBMatch || rootWMatch;
+        const color = rootBMatch ? 'BLACK' : 'WHITE';
+        const coord = match![1];
+        let x = 0, y = 0;
+        if (coord.length >= 2) {
+            x = fromSgfCoord(coord[0]);
+            y = fromSgfCoord(coord[1]);
+        }
+        if ((x === 0 && y === 0) || (x >= 1 && x <= size && y >= 1 && y <= size)) {
+            firstMoveNode.move = { x, y, color };
+        }
+        root.children.push(firstMoveNode);
+    }
+
+    parsePos = rootPropsEnd;
 
     // Now parse the moves
     while (parsePos < sgfContent.length && sgfContent[parsePos] !== ')') {
         if (sgfContent[parsePos] === ';' || sgfContent[parsePos] === '(') {
             if (sgfContent[parsePos] === '(') parsePos++; // Skip (
             const result = parseVariation(sgfContent, parsePos);
-            root.children.push(result.node);
+            // If first move was in root, add remaining moves as its children
+            if (firstMoveNode) {
+                firstMoveNode.children.push(result.node);
+            } else {
+                root.children.push(result.node);
+            }
             parsePos = result.endPos;
             if (parsePos < sgfContent.length && sgfContent[parsePos] === ')') parsePos++;
         } else {
