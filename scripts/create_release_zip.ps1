@@ -3,7 +3,7 @@
 # 
 # This script:
 # 1. Updates APP_VERSION in constants.ts to match release version
-# 2. Temporarily renames extension to "GORewrite" (removes " (Dev)")
+# 2. Temporarily renames extension to "Snap Goban" (removes " (Dev)")
 # 3. Builds the extension
 # 4. Creates a ZIP file
 # 5. Restores development versions of both files
@@ -11,7 +11,7 @@
 $manifestPath = "public\manifest.json"
 $constantsPath = "src\constants.ts"
 $releaseVersion = "2.0.1"
-$zipName = "GORewrite-v$releaseVersion.zip"
+$zipName = "SnapGoban-v$releaseVersion.zip"
 
 Write-Host "📦 Creating Release ZIP for v$releaseVersion..." -ForegroundColor Cyan
 Write-Host ""
@@ -28,11 +28,11 @@ $manifestContent = Get-Content $manifestPath -Raw | ConvertFrom-Json
 $originalName = $manifestContent.name
 Write-Host "📌 Current Name: $originalName" -ForegroundColor Gray
 
-$manifestContent.name = "GORewrite"
+$manifestContent.name = "Snap Goban"
 $manifestContent.version = $releaseVersion
 
 $manifestContent | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding UTF8
-Write-Host "✅ manifest.json switched to Production (Name: GORewrite, Version: $releaseVersion)" -ForegroundColor Green
+Write-Host "✅ manifest.json switched to Production (Name: Snap Goban, Version: $releaseVersion)" -ForegroundColor Green
 
 # 3. Build
 Write-Host ""

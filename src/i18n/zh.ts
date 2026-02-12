@@ -1,4 +1,4 @@
-// GORewrite i18n - Chinese (Simplified) translations
+// Snap Goban i18n - Chinese (Simplified) translations
 
 import { TranslationKey } from './ja';
 

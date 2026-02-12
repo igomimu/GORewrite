@@ -316,7 +316,7 @@ export async function saveFile(blob: Blob, filename: string, typeDescription: st
     if ('showSaveFilePicker' in window) {
         try {
             const pickerOptions: any = {
-                id: 'gorewrite-export', // specific ID to remember location
+                id: 'snap-goban-export', // specific ID to remember location
                 types: [{
                     description: typeDescription,
                     accept: { [mimeType]: ['.' + (filename ? filename.split('.').pop() : (mimeType.includes('png') ? 'png' : (mimeType.includes('gif') ? 'gif' : 'svg')))] }
@@ -406,7 +406,7 @@ export async function promptSaveFile(mimeType: string, filename: string): Promis
     try {
         const typeDescription = mimeType.split('/')[1].toUpperCase() + ' File';
         const pickerOptions: any = {
-            id: 'gorewrite-export',
+            id: 'snap-goban-export',
             types: [{
                 description: typeDescription,
                 accept: { [mimeType]: ['.' + (filename ? filename.split('.').pop() : (mimeType.includes('png') ? 'png' : (mimeType.includes('gif') ? 'gif' : 'svg')))] }

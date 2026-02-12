@@ -946,7 +946,7 @@ function App() {
                 setPrintSettings(JSON.parse(settingsStr));
 
                 // Set title
-                document.title = "Print Preview - GORewrite";
+                document.title = "Print Preview - Snap Goban";
 
                 const triggerPrint = () => {
                     try {
@@ -2493,7 +2493,7 @@ function App() {
                             </div>
                         </div>
                         <div className="mt-6 text-center text-xs text-gray-400">
-                            GORewrite {displayVersion}
+                            Snap Goban {displayVersion}
                         </div>
                     </div>
                 )}

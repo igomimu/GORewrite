@@ -3,7 +3,7 @@ from PIL import Image, ImageEnhance, ImageFilter
 
 # Configuration
 SOURCE_PATH = "/home/mimura/.gemini/antigravity/brain/2c069eec-8ad4-4b69-bfa0-90a5395e1ec3/uploaded_image_1766725838378.png"
-DEST_DIR = "/home/mimura/projects/GORewrite/public/icons"
+DEST_DIR = "/home/mimura/projects/snap-goban/public/icons"
 SIZES = [128, 48, 16]
 
 def generate_icons():

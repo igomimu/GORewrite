@@ -1,6 +1,6 @@
 ﻿{
     "manifest_version": 3,
-    "name": "GORewrite",
+    "name": "Snap Goban",
     "version": "2.0.5",
     "icons": {
         "16": "icons/icon16.png",

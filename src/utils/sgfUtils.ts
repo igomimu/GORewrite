@@ -1,7 +1,7 @@
 import { BoardState, StoneColor } from "../components/GoBoard";
 
 /*
-  Simple SGF Generator/Parser for GORewrite.
+  Simple SGF Generator/Parser for Snap Goban.
   Focuses on:
   1. AB[...], AW[...] for stone placement.
   2. LB[...] for numbered stones in diagram mode.
@@ -294,7 +294,7 @@ export function parseSGF(sgfContent: string): ParsedSGF {
                     stone.number = num;
                 }
                 // If labeling an empty spot?
-                // GORewrite supports numbered stones. Does it support numbered empty spots?
+                // Snap Goban supports numbered stones. Does it support numbered empty spots?
                 // Code: `if (stone) { ... {stone.number} ... }`.
                 // So we can only label stones. Ignoring empty labels for now.
             }

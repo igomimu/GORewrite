@@ -71,7 +71,7 @@ def create_go_icon(size, output_path):
     print(f"Generated: {output_path}")
 
 if __name__ == "__main__":
-    target_dir = r"c:\Users\lucky\VibeWorks-Yogapro-Win\GORewrite\public\icons"
+    target_dir = r"c:\Users\lucky\VibeWorks-Yogapro-Win\snap-goban\public\icons"
     os.makedirs(target_dir, exist_ok=True)
     
     targets = [16, 48, 128]

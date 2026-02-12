@@ -46,7 +46,7 @@ def super_enhance_lines(image_path):
         print(f"Failed to process {image_path}: {e}")
 
 if __name__ == "__main__":
-    target_dir = r"c:\Users\lucky\VibeWorks-Yogapro-Win\GORewrite\public\icons"
+    target_dir = r"c:\Users\lucky\VibeWorks-Yogapro-Win\snap-goban\public\icons"
     targets = ["icon16.png", "icon48.png", "icon128.png"]
     
     for filename in targets:
