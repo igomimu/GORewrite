@@ -7,6 +7,7 @@ import GlobalTooltip from './components/Tooltip'
 import { exportToPng, exportToSvg, exportToEmf, prepareSvgForExport, svgToPngBlob, saveFile, promptSaveFile, writeToHandle } from './utils/exportUtils'
 import { createGifFromImages } from './utils/gifExportUtils'
 import { checkCaptures } from './utils/gameLogic'
+import { saveLastDirHandle, loadLastDirHandle } from './utils/lastDirStore'
 import { parseSGFTree, generateSGFTree, SgfTreeNode } from './utils/sgfUtils'
 import { generatePrintFigures } from './utils/printUtils'
 import { APP_VERSION, DEV_VERSION } from './constants'
@@ -172,6 +173,20 @@ function App() {
     useEffect(() => { localStorage.setItem('gorw_is_monochrome', String(isMonochrome)); }, [isMonochrome]);
 
     const [saveFileHandle, setSaveFileHandle] = useState<any>(null);
+    const lastDirHandleRef = useRef<any>(null);
+
+    // 起動時にIndexedDBから前回のファイルハンドルを復元
+    useEffect(() => {
+        loadLastDirHandle().then(h => { if (h) lastDirHandleRef.current = h; });
+    }, []);
+
+    // ファイルハンドル変更時にIndexedDBへ永続化
+    useEffect(() => {
+        if (saveFileHandle) {
+            lastDirHandleRef.current = saveFileHandle;
+            saveLastDirHandle(saveFileHandle);
+        }
+    }, [saveFileHandle]);
 
     // Drag State
     type DragMode = 'SELECTING' | 'MOVING_STONE' | 'MOVING_SELECTION';
@@ -1844,7 +1859,7 @@ function App() {
                 // @ts-ignore
                 const [handle] = await window.showOpenFilePicker({
                     id: 'gorw_sgf',
-                    startIn: saveFileHandle || undefined,
+                    startIn: saveFileHandle || lastDirHandleRef.current || undefined,
                     types: [{
                         description: 'Smart Game Format',
                         accept: { 'application/x-go-sgf': ['.sgf'] },
@@ -1904,7 +1919,7 @@ function App() {
                 const handle = await window.showSaveFilePicker({
                     id: 'gorw_sgf',
                     suggestedName: '',
-                    startIn: saveFileHandle || undefined,
+                    startIn: saveFileHandle || lastDirHandleRef.current || undefined,
                     types: [{
                         description: 'Smart Game Format',
                         accept: { 'application/x-go-sgf': ['.sgf'] },
