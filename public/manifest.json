@@ -1,7 +1,7 @@
 ﻿{
     "manifest_version": 3,
     "name": "Snap Goban",
-    "version": "2.0.6",
+    "version": "2.0.7",
     "icons": {
         "16": "icons/icon16.png",
         "48": "icons/icon48.png",
@@ -16,6 +16,7 @@
         "default_path": "index.html"
     },
     "permissions": [
+        "sidePanel",
         "downloads"
     ]
 }
