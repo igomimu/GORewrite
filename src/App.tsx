@@ -45,7 +45,7 @@ export interface HistoryState {
     markers?: Marker[];
 }
 
-import { createNode, getPath, addMove, GameNode, recalculateBoards, replaceMove, getMainPath } from './utils/treeUtilsV2'
+import { createNode, getPath, addMove, GameNode, recalculateBoards, getMainPath } from './utils/treeUtilsV2'
 
 function App() {
     const { t, language, setLanguage } = useTranslation();
@@ -334,13 +334,6 @@ function App() {
                     return;
                 }
                 return; // Ignore other stones
-            }
-
-            // Replace pass move: if current node is a pass, click replaces it in-place
-            if (currentState.move?.x === 0 && currentState.move?.y === 0 && !currentStone) {
-                replaceMove(currentState, x, y);
-                setRootNode({ ...rootNode });
-                return;
             }
 
             // Place Numbered Stone
