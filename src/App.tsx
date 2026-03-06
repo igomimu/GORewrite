@@ -4,7 +4,7 @@ import GoBoard, { ViewRange, BoardState, StoneColor, Marker, Stone } from './com
 import GameInfoModal from './components/GameInfoModal'
 import PrintSettingsModal, { PrintSettings } from './components/PrintSettingsModal'
 import GlobalTooltip from './components/Tooltip'
-import { exportToPng, exportToSvg, exportToEmf, prepareSvgForExport, svgToPngBlob, saveFile, promptSaveFile, writeToHandle } from './utils/exportUtils'
+import { exportToPng, exportToSvg, exportToEmf, prepareSvgForExport, svgToPngBlob } from './utils/exportUtils'
 import { createGifFromImages } from './utils/gifExportUtils'
 import { checkCaptures } from './utils/gameLogic'
 import { saveLastDirHandle, loadLastDirHandle } from './utils/lastDirStore'
@@ -45,7 +45,7 @@ export interface HistoryState {
     markers?: Marker[];
 }
 
-import { createNode, getPath, addMove, GameNode, recalculateBoards, getMainPath } from './utils/treeUtilsV2'
+import { createNode, getPath, addMove, GameNode, recalculateBoards, replaceMove, getMainPath } from './utils/treeUtilsV2'
 
 function App() {
     const { t, language, setLanguage } = useTranslation();
@@ -334,6 +334,13 @@ function App() {
                     return;
                 }
                 return; // Ignore other stones
+            }
+
+            // Replace pass move: if current node is a pass, click replaces it in-place
+            if (currentState.move?.x === 0 && currentState.move?.y === 0 && !currentStone) {
+                replaceMove(currentState, x, y);
+                setRootNode({ ...rootNode });
+                return;
             }
 
             // Place Numbered Stone
@@ -1881,27 +1888,50 @@ function App() {
     };
 
     const handlePrintRequest = (settings: PrintSettings) => {
-        // 譜分け（Fu-wake）印刷 または 通常印刷の開始
+        // Chrome サイドパネルでは window.print() が無視されるため
+        // ユーザージェスチャ内で新規ウィンドウを開き、そこから印刷する
+        const printWindow = window.open('', '_blank');
 
         flushSync(() => {
             setPrintSettings(settings);
             setShowPrintModal(false);
-            setIsPrintJob(true); // 印刷用コンテンツの生成
+            setIsPrintJob(true);
         });
 
-        // 描画とメディアクエリの適用を確実にするため、短めのタイマーで実行
-        // 100ms はユーザーのジェスチャ（クリック）として認識される限界に近い安全圏
         setTimeout(() => {
             try {
-                window.focus();
-                window.print();
+                const printRoot = document.getElementById('print-root');
+                if (!printRoot || !printWindow) {
+                    throw new Error('Print resources not available');
+                }
+
+                // 現在のページの全CSSルールを収集してインライン化
+                const allCSS = Array.from(document.styleSheets)
+                    .flatMap(sheet => {
+                        try {
+                            return Array.from(sheet.cssRules).map(r => r.cssText);
+                        } catch {
+                            return [];
+                        }
+                    })
+                    .join('\n');
+
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${allCSS}</style></head><body>${printRoot.innerHTML}</body></html>`;
+
+                printWindow.document.open();
+                printWindow.document.write(html);
+                printWindow.document.close();
+
+                printWindow.onload = () => {
+                    printWindow.print();
+                };
             } catch (e) {
+                if (printWindow) printWindow.close();
                 console.error("Print dialog failed", e);
                 showToast(t('alert.printError'), 'error');
             }
-            // 印刷後はフラグを下ろす（隠しコンテナを空にする）
             setIsPrintJob(false);
-        }, 100);
+        }, 200);
     };
 
 

@@ -77,6 +77,34 @@ export const addMove = (
     return newNode;
 };
 
+export const replaceMove = (
+    node: GameNode,
+    newX: number,
+    newY: number
+) => {
+    if (!node.parent || !node.move) return;
+
+    // Update coordinates (keep original color)
+    node.move = { x: newX, y: newY, color: node.move.color };
+
+    // Recalculate board from parent
+    const newBoard: BoardState = node.parent.board.map(row =>
+        row.map(cell => cell ? { ...cell } : null)
+    );
+    if (newX > 0 && newY > 0) {
+        newBoard[newY - 1][newX - 1] = {
+            color: node.move.color,
+            number: node.parent.nextNumber
+        };
+        const captured = checkCaptures(newBoard, newX - 1, newY - 1, node.move.color);
+        captured.forEach(c => { newBoard[c.y][c.x] = null; });
+    }
+    node.board = newBoard;
+
+    // Propagate to descendants
+    recalculateBoards(node);
+};
+
 export const recalculateBoards = (node: GameNode) => {
     // This function assumes 'node' has the CORRECT board (e.g. Root was updated manually).
     // We update all children recursively based on their moves.
