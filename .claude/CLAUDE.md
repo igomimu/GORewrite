@@ -3,7 +3,7 @@
 ## 基本情報
 - **技術**: Vite/React/TypeScript/Tailwind/ブラウザ拡張
 - **GitHub**: igomimu/snap-goban
-- **バージョン**: v2.0.5
+- **バージョン**: v3.0.1（2026-03-04 Web Store審査提出済み）
 - **状態**: メンテナンス
 
 ## UI/Design Standards
