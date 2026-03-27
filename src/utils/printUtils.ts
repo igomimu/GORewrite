@@ -60,6 +60,23 @@ export function generatePrintFigures(history: HistoryState[], movesPerFigure: nu
             })
         );
 
+        // Restore captured stones: scan each move in this range
+        // If a stone was placed (has a number in range) but is missing from the final board, add it back
+        for (let j = startMoveNum; j <= endMoveNum; j++) {
+            const boardAtJ = history[j].board;
+            for (let y = 0; y < boardAtJ.length; y++) {
+                for (let x = 0; x < boardAtJ[y].length; x++) {
+                    const stone = boardAtJ[y][x];
+                    if (stone && stone.number !== undefined &&
+                        stone.number >= startMoveNum && stone.number <= endMoveNum) {
+                        if (!displayBoard[y][x]) {
+                            displayBoard[y][x] = { ...stone };
+                        }
+                    }
+                }
+            }
+        }
+
         figures.push({
             board: displayBoard,
             moves: [], // Not really needed if we use board state rendering

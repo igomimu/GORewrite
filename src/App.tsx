@@ -108,7 +108,7 @@ function App() {
         try { const saved = localStorage.getItem('gorw_export_mode'); return (saved === 'SVG' || saved === 'PNG' || saved === 'EMF') ? (saved as any) : 'SVG'; } catch { return 'SVG'; }
     });
 
-    const [showCapturedInExport, setShowCapturedInExport] = useState(false);
+    const [showCapturedInExport, setShowCapturedInExport] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackSpeed, setPlaybackSpeed] = useState(800); // ms per move (Default 0.8s)
 
@@ -3047,7 +3047,21 @@ function App() {
 
                 {/* Mode A: Current Board */}
                 {
-                    (!printSettings || printSettings.pagingType === 'CURRENT') && (
+                    (!printSettings || printSettings.pagingType === 'CURRENT') && (() => {
+                        // Merge captured stones back into the board for printing
+                        const restoredStones = getRestoredStones();
+                        const printBoard: BoardState = board.map(row => row.map(s => s ? { ...s } : null));
+                        for (const rs of restoredStones) {
+                            const x = rs.x - 1;
+                            const y = rs.y - 1;
+                            if (y >= 0 && y < printBoard.length && x >= 0 && x < printBoard[0].length && !printBoard[y][x]) {
+                                printBoard[y][x] = {
+                                    color: rs.color,
+                                    number: rs.text ? parseInt(rs.text) : undefined
+                                };
+                            }
+                        }
+                        return (
                         <div className="flex flex-col items-center w-full min-h-screen pt-12 print:pt-0">
                             {/* Header Area */}
                             <div className="w-full mb-4 text-center">
@@ -3070,7 +3084,7 @@ function App() {
                             {/* Board */}
                             <div className="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] flex justify-center border-0 border-transparent mb-4">
                                 <GoBoard
-                                    boardState={board}
+                                    boardState={printBoard}
                                     boardSize={boardSize}
                                     showCoordinates={printSettings?.showCoordinate ?? showCoordinates}
                                     showNumbers={printSettings?.showMoveNumber ?? showNumbers}
@@ -3093,7 +3107,8 @@ function App() {
                                 {(printSettings?.showFooter !== false) && formatPrintString(printSettings?.footer || '')}
                             </div>
                         </div>
-                    )
+                        );
+                    })()
                 }
 
                 {/* Mode B: Whole File */}
