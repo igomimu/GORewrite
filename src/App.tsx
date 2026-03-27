@@ -956,14 +956,10 @@ function App() {
 
 
 
-    // 棋士写真パネル（印刷用）
-    const renderPlayerPanel = () => {
-        if (!printSettings?.showPlayerPhotos) return null;
-        const hasAnyPhoto = printBlackPhoto || printWhitePhoto;
-        const hasAnyName = blackName || whiteName;
-        if (!hasAnyPhoto && !hasAnyName) return null;
-
-        const formatRankForPanel = (r: string) => {
+    // 写真統合ヘッダー: [黒写真+名前] タイトル [白写真+名前]
+    const renderIntegratedHeader = (settings: PrintSettings | null, pageNum: number) => {
+        const showPhotos = settings?.showPlayerPhotos && (printBlackPhoto || printWhitePhoto || blackName || whiteName);
+        const formatRank = (r: string) => {
             if (!r) return '';
             let f = r.replace(/[pP]/g, '');
             return f.replace(/(\d+)([dD段])/g, (_, numStr: string, type: string) => {
@@ -978,26 +974,52 @@ function App() {
             }).replace(/(\d+)([kK級])/g, (_, numStr: string) => numStr + '級');
         };
 
-        const PhotoCircle = ({ photo, color }: { photo: string | null; color: 'black' | 'white' }) => (
-            <div style={{ width: 40, height: 40, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: color === 'black' ? '#1a1a1a' : '#f5f5f5' }}>
-                {photo ? (
-                    <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                    <div style={{ width: 20, height: 20, borderRadius: '50%', backgroundColor: color === 'black' ? '#fff' : '#1a1a1a' }} />
-                )}
+        const PlayerBadge = ({ photo, name, rank, color }: { photo: string | null; name: string; rank: string; color: 'black' | 'white' }) => (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: color === 'black' ? '#1a1a1a' : '#f5f5f5' }}>
+                    {photo ? (
+                        <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                        <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: color === 'black' ? '#fff' : '#1a1a1a' }} />
+                    )}
+                </div>
+                <div style={{ fontSize: 11, lineHeight: 1.3, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name || (color === 'black' ? '黒番' : '白番')}</div>
+                    {rank && <div style={{ color: '#666' }}>{formatRank(rank)}</div>}
+                </div>
             </div>
         );
 
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '8px 0 12px', padding: '0 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <PhotoCircle photo={printBlackPhoto} color="black" />
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>黒 {blackName || '黒番'}{blackRank ? ` ${formatRankForPanel(blackRank)}` : ''}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <PhotoCircle photo={printWhitePhoto} color="white" />
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>白 {whiteName || '白番'}{whiteRank ? ` ${formatRankForPanel(whiteRank)}` : ''}</span>
-                </div>
+            <div style={{ width: '100%', marginBottom: 12 }}>
+                {showPhotos ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <PlayerBadge photo={printBlackPhoto} name={blackName} rank={blackRank} color="black" />
+                        <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+                            {(settings?.showTitle !== false) && (
+                                <div style={{ fontSize: 18, fontWeight: 700 }}>{formatPrintString(settings?.title || '%GN%', pageNum)}</div>
+                            )}
+                            {(settings?.showSubTitle !== false) && (
+                                <div style={{ fontSize: 13, color: '#666' }}>{formatPrintString(settings?.subTitle || '%DT%', pageNum)}</div>
+                            )}
+                        </div>
+                        <PlayerBadge photo={printWhitePhoto} name={whiteName} rank={whiteRank} color="white" />
+                    </div>
+                ) : (
+                    <div style={{ textAlign: 'center' }}>
+                        {(settings?.showTitle !== false) && (
+                            <h1 className="text-2xl font-bold mb-1">{formatPrintString(settings?.title || '%GN%', pageNum)}</h1>
+                        )}
+                        {(settings?.showSubTitle !== false) && (
+                            <h2 className="text-lg text-gray-600">{formatPrintString(settings?.subTitle || '%DT%', pageNum)}</h2>
+                        )}
+                    </div>
+                )}
+                {(settings?.showHeader !== false) && (
+                    <div style={{ textAlign: 'right', fontSize: 10, color: '#888', marginTop: 4, borderBottom: '1px solid #ccc', paddingBottom: 2 }}>
+                        {formatPrintString(settings?.header || '', pageNum)}
+                    </div>
+                )}
             </div>
         );
     };
@@ -3063,23 +3085,8 @@ function App() {
                         }
                         return (
                         <div className="flex flex-col items-center w-full min-h-screen pt-12 print:pt-0">
-                            {/* Header Area */}
-                            <div className="w-full mb-4 text-center">
-                                {(printSettings?.showTitle !== false) && (
-                                    <h1 className="text-2xl font-bold mb-1">{formatPrintString(printSettings?.title || '%GN%')}</h1>
-                                )}
-                                {(printSettings?.showSubTitle !== false) && (
-                                    <h2 className="text-lg text-gray-600">{formatPrintString(printSettings?.subTitle || '%DT%')}</h2>
-                                )}
-                                {(printSettings?.showHeader !== false) && (
-                                    <div className="text-right text-xs text-gray-500 mt-2 border-b border-gray-400">
-                                        {formatPrintString(printSettings?.header || '')}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Player Photos */}
-                            {renderPlayerPanel()}
+                            {/* Header Area with Player Photos */}
+                            {renderIntegratedHeader(printSettings, 1)}
 
                             {/* Board */}
                             <div className="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] flex justify-center border-0 border-transparent mb-4">
@@ -3192,19 +3199,8 @@ function App() {
 
                                     return (
                                         <div key={pageIdx} className="page-break w-full min-h-screen p-4 box-border flex flex-col justify-center">
-                                            {/* Page Header */}
-                                            {showHeader && (
-                                                <div className="w-full mb-4 text-center">
-                                                    <h1 className="text-xl font-bold mb-1">{formatPrintString(printSettings.title, pageIdx + 1)}</h1>
-                                                    {printSettings.subTitle && <h2 className="text-sm text-gray-600">{formatPrintString(printSettings.subTitle, pageIdx + 1)}</h2>}
-                                                    <div className="text-right text-xs text-gray-500 mt-2 border-b border-gray-400">
-                                                        {formatPrintString(printSettings.header, pageIdx + 1)}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Player Photos (headerFrequencyに連動) */}
-                                            {showHeader && renderPlayerPanel()}
+                                            {/* Page Header with Player Photos */}
+                                            {showHeader && renderIntegratedHeader(printSettings, pageIdx + 1)}
 
                                             <div className={`${getGridClass(perPage)} w-full flex-grow`}>
                                                 {chunk.map((fig, i) => (
