@@ -10,6 +10,7 @@ import { checkCaptures } from './utils/gameLogic'
 import { saveLastDirHandle, loadLastDirHandle } from './utils/lastDirStore'
 import { parseSGFTree, generateSGFTree, SgfTreeNode } from './utils/sgfUtils'
 import { generatePrintFigures } from './utils/printUtils'
+import { getPhoto } from './utils/kishiPhotoStore'
 import { APP_VERSION, DEV_VERSION } from './constants'
 import { useTranslation, Language, languageNames } from './i18n'
 
@@ -64,6 +65,8 @@ function App() {
 
     const [toolMode, setToolMode] = useState<ToolMode>('STONE');
     const [isPrintJob, setIsPrintJob] = useState(false);
+    const [printBlackPhoto, setPrintBlackPhoto] = useState<string | null>(null);
+    const [printWhitePhoto, setPrintWhitePhoto] = useState<string | null>(null);
     const [nextLabelChar, setNextLabelChar] = useState<string>('A');
     const [selectedSymbol, setSelectedSymbol] = useState<SymbolType>('TRI');
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -952,6 +955,52 @@ function App() {
     };
 
 
+
+    // 棋士写真パネル（印刷用）
+    const renderPlayerPanel = () => {
+        if (!printSettings?.showPlayerPhotos) return null;
+        const hasAnyPhoto = printBlackPhoto || printWhitePhoto;
+        const hasAnyName = blackName || whiteName;
+        if (!hasAnyPhoto && !hasAnyName) return null;
+
+        const formatRankForPanel = (r: string) => {
+            if (!r) return '';
+            let f = r.replace(/[pP]/g, '');
+            return f.replace(/(\d+)([dD段])/g, (_, numStr: string, type: string) => {
+                const n = parseInt(numStr);
+                const isDan = /[dD段]/.test(type);
+                if (!isDan) return numStr + '級';
+                if (n === 1) return '初段';
+                const digits = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+                if (n < 10) return digits[n] + '段';
+                if (n < 20) return '十' + (n % 10 === 0 ? '' : digits[n % 10]) + '段';
+                return numStr + '段';
+            }).replace(/(\d+)([kK級])/g, (_, numStr: string) => numStr + '級');
+        };
+
+        const PhotoCircle = ({ photo, color }: { photo: string | null; color: 'black' | 'white' }) => (
+            <div style={{ width: 40, height: 40, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: color === 'black' ? '#1a1a1a' : '#f5f5f5' }}>
+                {photo ? (
+                    <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', backgroundColor: color === 'black' ? '#fff' : '#1a1a1a' }} />
+                )}
+            </div>
+        );
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '8px 0 12px', padding: '0 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <PhotoCircle photo={printBlackPhoto} color="black" />
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>黒 {blackName || '黒番'}{blackRank ? ` ${formatRankForPanel(blackRank)}` : ''}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <PhotoCircle photo={printWhitePhoto} color="white" />
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>白 {whiteName || '白番'}{whiteRank ? ` ${formatRankForPanel(whiteRank)}` : ''}</span>
+                </div>
+            </div>
+        );
+    };
 
     // Print Job Initialization removed (Moved to handlePrintRequest direct flow)
 
@@ -1880,12 +1929,24 @@ function App() {
         }
     };
 
-    const handlePrintRequest = (settings: PrintSettings) => {
+    const handlePrintRequest = async (settings: PrintSettings) => {
         // Chrome サイドパネルでは window.print() が無視されるため
         // ユーザージェスチャ内で新規ウィンドウを開き、そこから印刷する
         const printWindow = window.open('', '_blank');
 
+        // 棋士写真を事前取得（非同期）
+        let bPhoto: string | null = null;
+        let wPhoto: string | null = null;
+        if (settings.showPlayerPhotos) {
+            [bPhoto, wPhoto] = await Promise.all([
+                getPhoto(blackName).catch(() => null),
+                getPhoto(whiteName).catch(() => null),
+            ]);
+        }
+
         flushSync(() => {
+            setPrintBlackPhoto(bPhoto);
+            setPrintWhitePhoto(wPhoto);
             setPrintSettings(settings);
             setShowPrintModal(false);
             setIsPrintJob(true);
@@ -3003,6 +3064,9 @@ function App() {
                                 )}
                             </div>
 
+                            {/* Player Photos */}
+                            {renderPlayerPanel()}
+
                             {/* Board */}
                             <div className="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] flex justify-center border-0 border-transparent mb-4">
                                 <GoBoard
@@ -3123,6 +3187,9 @@ function App() {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Player Photos (headerFrequencyに連動) */}
+                                            {showHeader && renderPlayerPanel()}
 
                                             <div className={`${getGridClass(perPage)} w-full flex-grow`}>
                                                 {chunk.map((fig, i) => (

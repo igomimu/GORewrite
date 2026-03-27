@@ -235,4 +235,14 @@ export const en: Record<TranslationKey, string> = {
     'print.var.komiL': 'KomiL',
     'print.var.time': 'Time',
     'print.var.page': 'Page',
+
+    // Player Photos
+    'print.showPlayerPhotos': 'Show player photos',
+    'print.photoDb': 'Photo DB',
+    'print.photoCount': '{count} registered',
+    'print.importJson': 'Import JSON',
+    'print.clearPhotos': 'Clear',
+    'print.importSuccess': 'Imported {count} photos',
+    'print.importError': 'Failed to import photos',
+    'print.photosCleared': 'Photo DB cleared',
 };

@@ -235,4 +235,14 @@ export const zh: Record<TranslationKey, string> = {
     'print.var.komiL': '贴目L',
     'print.var.time': '时间',
     'print.var.page': '页',
+
+    // Player Photos
+    'print.showPlayerPhotos': '显示棋手照片',
+    'print.photoDb': '照片数据库',
+    'print.photoCount': '已注册{count}人',
+    'print.importJson': '导入JSON',
+    'print.clearPhotos': '清除',
+    'print.importSuccess': '已导入{count}张照片',
+    'print.importError': '照片导入失败',
+    'print.photosCleared': '照片数据库已清除',
 };

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '../i18n';
+import { importPhotosFromJSON, getPhotoCount, clearPhotos } from '../utils/kishiPhotoStore';
 
 export interface PrintSettings {
     pagingType: 'CURRENT' | 'WHOLE_FILE_MOVE' | 'WHOLE_FILE_FIGURE';
@@ -19,6 +20,7 @@ export interface PrintSettings {
     showFooter: boolean;
     colorMode: 'COLOR' | 'MONOCHROME';
     layout: 'AUTO' | '1COL' | '2COL';
+    showPlayerPhotos: boolean;
 }
 
 export const DEFAULT_SETTINGS: PrintSettings = {
@@ -38,7 +40,8 @@ export const DEFAULT_SETTINGS: PrintSettings = {
     footer: '',
     showFooter: true,
     colorMode: 'COLOR',
-    layout: 'AUTO'
+    layout: 'AUTO',
+    showPlayerPhotos: true
 };
 
 interface PrintSettingsModalProps {
@@ -52,6 +55,13 @@ const PrintSettingsModal: React.FC<PrintSettingsModalProps> = ({ isOpen, onClose
     const { t } = useTranslation();
     const [settings, setSettings] = useState<PrintSettings>(DEFAULT_SETTINGS);
     const [lastFocusedInput, setLastFocusedInput] = useState<keyof Pick<PrintSettings, 'title' | 'subTitle' | 'header' | 'footer'>>('title');
+    const [photoCount, setPhotoCount] = useState(0);
+    const [photoMessage, setPhotoMessage] = useState('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const refreshPhotoCount = async () => {
+        try { setPhotoCount(await getPhotoCount()); } catch { setPhotoCount(0); }
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -67,8 +77,30 @@ const PrintSettingsModal: React.FC<PrintSettingsModalProps> = ({ isOpen, onClose
             } else if (initialSettings) {
                 setSettings({ ...DEFAULT_SETTINGS, ...initialSettings });
             }
+            refreshPhotoCount();
         }
     }, [isOpen, initialSettings]);
+
+    const handleImportPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const count = await importPhotosFromJSON(file);
+            setPhotoMessage(t('print.importSuccess').replace('{count}', String(count)));
+            await refreshPhotoCount();
+        } catch {
+            setPhotoMessage(t('print.importError'));
+        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setTimeout(() => setPhotoMessage(''), 3000);
+    };
+
+    const handleClearPhotos = async () => {
+        await clearPhotos();
+        setPhotoCount(0);
+        setPhotoMessage(t('print.photosCleared'));
+        setTimeout(() => setPhotoMessage(''), 3000);
+    };
 
     if (!isOpen) return null;
 
@@ -162,7 +194,29 @@ const PrintSettingsModal: React.FC<PrintSettingsModalProps> = ({ isOpen, onClose
                                     onChange={e => handleChange('colorMode', e.target.checked ? 'MONOCHROME' : 'COLOR')} />
                                 <span className="text-xs">{t('print.monochromeMode')}</span>
                             </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={settings.showPlayerPhotos}
+                                    onChange={e => handleChange('showPlayerPhotos', e.target.checked)} />
+                                <span className="text-xs">{t('print.showPlayerPhotos')}</span>
+                            </label>
                         </div>
+
+                        {/* Photo DB */}
+                        <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                            <span>{t('print.photoDb')}: {t('print.photoCount').replace('{count}', String(photoCount))}</span>
+                            <button
+                                className="px-1.5 py-0.5 bg-white border border-gray-400 rounded hover:bg-gray-100 shadow-sm"
+                                onClick={() => fileInputRef.current?.click()}
+                            >{t('print.importJson')}</button>
+                            {photoCount > 0 && (
+                                <button
+                                    className="px-1.5 py-0.5 bg-white border border-gray-400 rounded hover:bg-gray-100 shadow-sm text-red-500"
+                                    onClick={handleClearPhotos}
+                                >{t('print.clearPhotos')}</button>
+                            )}
+                            <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImportPhotos} />
+                        </div>
+                        {photoMessage && <div className="text-xs text-green-600 mt-1">{photoMessage}</div>}
 
                         <div className="flex justify-between items-center mb-2 gap-2">
                             <div className="flex items-center gap-2">

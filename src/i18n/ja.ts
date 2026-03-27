@@ -233,6 +233,16 @@ export const ja = {
     'print.var.komiL': 'コミL',
     'print.var.time': '時間',
     'print.var.page': '頁',
+
+    // Player Photos
+    'print.showPlayerPhotos': '棋士写真を表示',
+    'print.photoDb': '写真DB',
+    'print.photoCount': '{count}人登録済み',
+    'print.importJson': 'JSONインポート',
+    'print.clearPhotos': 'クリア',
+    'print.importSuccess': '{count}人の写真を登録しました',
+    'print.importError': '写真の読み込みに失敗しました',
+    'print.photosCleared': '写真DBをクリアしました',
 } as const;
 
 export type TranslationKey = keyof typeof ja;
