@@ -1771,7 +1771,9 @@ function App() {
         try {
             const originalNodeId = currentNodeId;
             const originalFigureMode = isFigureMode;
-            setIsFigureMode(true);
+            // GIF is animated — each frame shows moves sequentially, so labels (A,B,C) are unnecessary.
+            // Keep isFigureMode false so move numbers are displayed instead of collision labels.
+            setIsFigureMode(false);
 
             // Navigate through the main path (Full game sequence)
             const mainPath = getMainPath(rootNode);
