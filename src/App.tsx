@@ -779,6 +779,52 @@ function App() {
         return restored;
     }, [history, currentMoveIndex, boardSize]);
 
+    const appendCapturedStonesForExport = useCallback((
+        svgRoot: SVGSVGElement,
+        restoredStones: { x: number, y: number, color: StoneColor, text: string }[],
+        bounds: { minX: number, maxX: number, minY: number, maxY: number }
+    ) => {
+        const CELL_SIZE = 40;
+        const MARGIN = 40;
+        const svgNS = "http://www.w3.org/2000/svg";
+
+        restoredStones.forEach(stone => {
+            if (stone.x < bounds.minX || stone.x > bounds.maxX || stone.y < bounds.minY || stone.y > bounds.maxY) return;
+
+            const cx = MARGIN + (stone.x - 1) * CELL_SIZE;
+            const cy = MARGIN + (stone.y - 1) * CELL_SIZE;
+
+            const g = document.createElementNS(svgNS, 'g');
+            g.setAttribute('opacity', '0.4');
+
+            const circle = document.createElementNS(svgNS, 'circle');
+            circle.setAttribute('cx', cx.toString());
+            circle.setAttribute('cy', cy.toString());
+            circle.setAttribute('r', '18.4');
+            circle.setAttribute('fill', stone.color === 'BLACK' ? '#000000' : '#FFFFFF');
+            circle.setAttribute('stroke', '#000000');
+            circle.setAttribute('stroke-width', stone.color === 'BLACK' ? '2' : '0.7');
+
+            g.appendChild(circle);
+
+            if (stone.text) {
+                const text = document.createElementNS(svgNS, 'text');
+                text.setAttribute('x', cx.toString());
+                text.setAttribute('y', cy.toString());
+                text.setAttribute('dy', '.35em');
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('fill', stone.color === 'BLACK' ? '#FFFFFF' : '#000000');
+                text.setAttribute('font-size', stone.text.length >= 3 ? '18' : '26');
+                text.setAttribute('font-family', 'Arial, sans-serif');
+                text.setAttribute('font-weight', 'bold');
+                text.textContent = stone.text;
+                g.appendChild(text);
+            }
+
+            svgRoot.appendChild(g);
+        });
+    }, []);
+
 
 
     // Kifu Metadata
@@ -1317,7 +1363,6 @@ function App() {
         if (!svgRef.current) return;
 
         const { mode, destination = 'CLIPBOARD', filename } = options;
-        const stonesToDraw = restoredStones;
         const CELL_SIZE = 40;
         const MARGIN = 40;
         const PADDING = 20;
@@ -1341,44 +1386,10 @@ function App() {
             if (r.getAttribute('fill') === 'rgba(0, 0, 255, 0.2)') r.remove();
         });
 
-        // Append Restored Stones
         const svgNS = "http://www.w3.org/2000/svg";
 
-        // Grid lines should extend to selection boundary (with padding)
-        // The coverRect in legend section will hide lines in the expanded area
         if (showCapturedInExport) {
-            restoredStones.forEach(stone => {
-                if (stone.x < minX || stone.x > maxX || stone.y < minY || stone.y > maxY) return;
-
-                const cx = MARGIN + (stone.x - 1) * CELL_SIZE;
-                const cy = MARGIN + (stone.y - 1) * CELL_SIZE;
-
-                const g = document.createElementNS(svgNS, 'g');
-
-                const circle = document.createElementNS(svgNS, 'circle');
-                circle.setAttribute('cx', cx.toString());
-                circle.setAttribute('cy', cy.toString());
-                circle.setAttribute('r', '18.4');
-                circle.setAttribute('fill', stone.color === 'BLACK' ? '#000000' : '#FFFFFF');
-                circle.setAttribute('stroke', '#000000');
-                circle.setAttribute('stroke-width', stone.color === 'BLACK' ? '2' : '0.7');
-
-                const text = document.createElementNS(svgNS, 'text');
-                text.setAttribute('x', cx.toString());
-                text.setAttribute('y', cy.toString());
-                text.setAttribute('dy', '.35em');
-                text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('fill', stone.color === 'BLACK' ? '#FFFFFF' : '#000000');
-                const fontSize = (stone.text && stone.text.length >= 3) ? '18' : '26';
-                text.setAttribute('font-size', fontSize);
-                text.setAttribute('font-family', 'Arial, sans-serif');
-                text.setAttribute('font-weight', 'bold');
-                text.textContent = stone.text;
-
-                g.appendChild(circle);
-                g.appendChild(text);
-                clone.appendChild(g);
-            });
+            appendCapturedStonesForExport(clone, restoredStones, bounds);
         }
 
         // Draw Special Labels (Collision Markers) on Board
@@ -1699,7 +1710,7 @@ function App() {
         } else {
             await exportToPng(clone, { scale: 3, backgroundColor: bgColor, destination: destination, filename });
         }
-    }, [hiddenMoves, stonesToDraw, showCoordinates, showCapturedInExport, isMonochrome, specialLabels, boardSize, svgRef]);
+    }, [appendCapturedStonesForExport, hiddenMoves, showCoordinates, showCapturedInExport, isMonochrome, specialLabels, boardSize, svgRef]);
 
 
     const handleExport = useCallback(async (forcedMode?: 'SVG' | 'PNG', destination?: 'CLIPBOARD' | 'DOWNLOAD') => {
