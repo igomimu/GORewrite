@@ -149,3 +149,28 @@ export const getMainPath = (root: GameNode): GameNode[] => {
     }
     return path;
 };
+
+/**
+ * DFS traversal that visits all branches.
+ * At each branch point, plays branch A to its leaf, returns to the branch point,
+ * then plays branch B to its leaf, etc.
+ */
+export const getPathWithBranches = (root: GameNode): GameNode[] => {
+    const path: GameNode[] = [];
+
+    const traverse = (node: GameNode) => {
+        path.push(node);
+        if (node.children.length === 0) return;
+        if (node.children.length === 1) {
+            traverse(node.children[0]);
+        } else {
+            for (let i = 0; i < node.children.length; i++) {
+                if (i > 0) path.push(node); // return to branch point
+                traverse(node.children[i]);
+            }
+        }
+    };
+
+    traverse(root);
+    return path;
+};

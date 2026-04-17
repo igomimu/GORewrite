@@ -46,7 +46,7 @@ export interface HistoryState {
     markers?: Marker[];
 }
 
-import { createNode, getPath, addMove, GameNode, recalculateBoards, getMainPath } from './utils/treeUtilsV2'
+import { createNode, getPath, addMove, GameNode, recalculateBoards, getPathWithBranches } from './utils/treeUtilsV2'
 
 function App() {
     const { t, language, setLanguage } = useTranslation();
@@ -1786,8 +1786,8 @@ function App() {
             // Keep isFigureMode false so move numbers are displayed instead of collision labels.
             setIsFigureMode(false);
 
-            // Navigate through the main path (Full game sequence)
-            const mainPath = getMainPath(rootNode);
+            // Navigate through all branches (DFS: branch A → rewind → branch B → ...)
+            const mainPath = getPathWithBranches(rootNode);
             const frames: string[] = [];
 
             // Capture frames
