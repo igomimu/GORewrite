@@ -31,9 +31,21 @@ function openDB(): Promise<IDBDatabase> {
     });
 }
 
-/** 名前を正規化: 全角スペース・半角スペース除去 */
+/** CJK異体字を統一する */
+const VARIANT_MAP: Record<string, string> = {
+    '\u771E': '\u771F', // 眞→真
+    '\u8C1E': '\u8ADD', // 谞→諝
+    '\u9F4A': '\u6589', // 齊→斉
+    '\u9AD9': '\u9AD8', // 髙→高
+    '\u6F81': '\u6E0B', // 澁→渋
+    '\u908A': '\u8FBA', // 邊→辺
+};
+
+/** 名前を正規化: スペース除去 + 異体字統一 */
 function normalizeName(name: string): string {
-    return name.replace(/\u3000/g, '').replace(/ /g, '').trim();
+    let s = name.replace(/\u3000/g, '').replace(/ /g, '').trim();
+    s = Array.from(s).map(c => VARIANT_MAP[c] || c).join('');
+    return s;
 }
 
 /** JSONファイルから写真をインポート。登録数を返す。 */
