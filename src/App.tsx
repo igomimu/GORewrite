@@ -1021,17 +1021,17 @@ function App() {
         };
 
         const PlayerBadge = ({ photo, name, rank, color }: { photo: string | null; name: string; rank: string; color: 'black' | 'white' }) => (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: color === 'black' ? '#1a1a1a' : '#f5f5f5' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <div style={{ width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '1px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: color === 'black' ? '#1a1a1a' : '#f5f5f5' }}>
                     {photo ? (
                         <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                        <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: color === 'black' ? '#fff' : '#1a1a1a' }} />
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: color === 'black' ? '#fff' : '#1a1a1a' }} />
                     )}
                 </div>
-                <div style={{ fontSize: 11, lineHeight: 1.3, minWidth: 0 }}>
+                <div style={{ fontSize: 14, lineHeight: 1.3, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name || (color === 'black' ? '黒番' : '白番')}</div>
-                    {rank && <div style={{ color: '#666' }}>{formatRank(rank)}</div>}
+                    {rank && <div style={{ color: '#666', fontSize: 12 }}>{formatRank(rank)}</div>}
                 </div>
             </div>
         );
