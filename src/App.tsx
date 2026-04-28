@@ -1043,10 +1043,13 @@ function App() {
                         <PlayerBadge photo={printBlackPhoto} name={blackName} rank={blackRank} color="black" />
                         <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
                             {(settings?.showTitle !== false) && (
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{formatPrintString(settings?.title || '%GN%', pageNum)}</div>
+                                <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.2 }}>{formatPrintString(settings?.title || '%GN%', pageNum)}</div>
                             )}
                             {(settings?.showSubTitle !== false) && (
-                                <div style={{ fontSize: 13, color: '#666' }}>{formatPrintString(settings?.subTitle || '%DT%', pageNum)}</div>
+                                <div style={{ fontSize: 13, color: '#666', lineHeight: 1.2 }}>{formatPrintString(settings?.subTitle || '%DT%', pageNum)}</div>
+                            )}
+                            {gameResult && (
+                                <div style={{ fontSize: 12, color: '#666', lineHeight: 1.2 }}>{formatPrintString('%RE%', pageNum)}</div>
                             )}
                         </div>
                         <PlayerBadge photo={printWhitePhoto} name={whiteName} rank={whiteRank} color="white" />
@@ -2005,7 +2008,7 @@ function App() {
                     })
                     .join('\n');
 
-                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:1cm}\n${allCSS}</style></head><body>${printRoot.innerHTML}</body></html>`;
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:5mm}\n${allCSS}</style></head><body>${printRoot.innerHTML}</body></html>`;
 
                 printWindow.document.open();
                 printWindow.document.write(html);
@@ -3102,7 +3105,7 @@ function App() {
                             {renderIntegratedHeader(printSettings, 1)}
 
                             {/* Board */}
-                            <div className="w-full aspect-square max-w-[720px] mb-4">
+                            <div className="w-full aspect-square max-w-[760px] mb-4">
                                 <GoBoard
                                     boardState={printBoard}
                                     boardSize={boardSize}
