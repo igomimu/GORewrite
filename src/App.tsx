@@ -2005,7 +2005,7 @@ function App() {
                     })
                     .join('\n');
 
-                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${allCSS}</style></head><body>${printRoot.innerHTML}</body></html>`;
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:1cm}\n${allCSS}</style></head><body>${printRoot.innerHTML}</body></html>`;
 
                 printWindow.document.open();
                 printWindow.document.write(html);
@@ -3102,7 +3102,7 @@ function App() {
                             {renderIntegratedHeader(printSettings, 1)}
 
                             {/* Board */}
-                            <div className="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] flex justify-center border-0 border-transparent mb-4">
+                            <div className="w-full aspect-square max-w-[720px] mb-4">
                                 <GoBoard
                                     boardState={printBoard}
                                     boardSize={boardSize}
