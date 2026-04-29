@@ -3086,16 +3086,32 @@ function App() {
                 {/* Mode A: Current Board */}
                 {
                     (!printSettings || printSettings.pagingType === 'CURRENT') && (() => {
-                        // Merge captured stones back into the board for printing
-                        const restoredStones = getRestoredStones();
+                        // Build print board with same information as image export:
+                        //   - Overlay stonesToDraw so collision positions show the EARLIEST move's number
+                        //     (later moves go to the legend via hiddenMoves)
+                        //   - Restore captured setup stones (not covered by stonesToDraw)
                         const printBoard: BoardState = board.map(row => row.map(s => s ? { ...s } : null));
+
+                        for (const stone of stonesToDraw) {
+                            const x = stone.x - 1;
+                            const y = stone.y - 1;
+                            if (y >= 0 && y < printBoard.length && x >= 0 && x < printBoard[0].length) {
+                                const isNumber = !!stone.text && /^\d+$/.test(stone.text);
+                                printBoard[y][x] = {
+                                    color: stone.color,
+                                    number: isNumber ? parseInt(stone.text) : undefined,
+                                };
+                            }
+                        }
+
+                        const restoredStones = getRestoredStones();
                         for (const rs of restoredStones) {
                             const x = rs.x - 1;
                             const y = rs.y - 1;
                             if (y >= 0 && y < printBoard.length && x >= 0 && x < printBoard[0].length && !printBoard[y][x]) {
                                 printBoard[y][x] = {
                                     color: rs.color,
-                                    number: rs.text ? parseInt(rs.text) : undefined
+                                    number: rs.text ? parseInt(rs.text) : undefined,
                                 };
                             }
                         }
@@ -3104,14 +3120,16 @@ function App() {
                             {/* Header Area with Player Photos */}
                             {renderIntegratedHeader(printSettings, 1)}
 
-                            {/* Board */}
-                            <div className="w-full aspect-square max-w-[760px] mb-4">
+                            {/* Board (height adjusts to include legend below the grid) */}
+                            <div className="w-full max-w-[760px] mb-4">
                                 <GoBoard
                                     boardState={printBoard}
                                     boardSize={boardSize}
                                     showCoordinates={printSettings?.showCoordinate ?? showCoordinates}
                                     showNumbers={printSettings?.showMoveNumber ?? showNumbers}
                                     markers={currentState.markers || []}
+                                    hiddenMoves={hiddenMoves}
+                                    specialLabels={specialLabels}
                                     onCellClick={() => { }}
                                     onCellRightClick={() => { }}
                                     onBoardWheel={() => { }}
