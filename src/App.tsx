@@ -3120,15 +3120,14 @@ function App() {
                             {/* Header Area with Player Photos */}
                             {renderIntegratedHeader(printSettings, 1)}
 
-                            {/* Board (height adjusts to include legend below the grid) */}
-                            <div className="w-full max-w-[760px] mb-4">
+                            {/* Board (legend rendered separately as HTML below) */}
+                            <div className="w-full aspect-square max-w-[760px] mb-2">
                                 <GoBoard
                                     boardState={printBoard}
                                     boardSize={boardSize}
                                     showCoordinates={printSettings?.showCoordinate ?? showCoordinates}
                                     showNumbers={printSettings?.showMoveNumber ?? showNumbers}
                                     markers={currentState.markers || []}
-                                    hiddenMoves={hiddenMoves}
                                     specialLabels={specialLabels}
                                     onCellClick={() => { }}
                                     onCellRightClick={() => { }}
@@ -3142,6 +3141,58 @@ function App() {
                                     readOnly={true}
                                 />
                             </div>
+
+                            {/* 欄外凡例（衝突手） */}
+                            {hiddenMoves.length > 0 && (
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: '4px 12px',
+                                        width: '100%',
+                                        maxWidth: 760,
+                                        fontSize: 11,
+                                        color: '#000',
+                                        lineHeight: 1.6,
+                                        marginBottom: 8,
+                                        pageBreakInside: 'avoid',
+                                    }}
+                                >
+                                    {hiddenMoves.map((item, i) => {
+                                        const left = item.left[0];
+                                        const baseColor = item.right.color === 'BLACK' ? '#000' : '#fff';
+                                        const baseTextColor = item.right.color === 'BLACK' ? '#fff' : '#000';
+                                        const laterColor = left?.color === 'BLACK' ? '#000' : '#fff';
+                                        const laterTextColor = left?.color === 'BLACK' ? '#fff' : '#000';
+                                        const stoneStyle = (bg: string, fg: string): React.CSSProperties => ({
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: 22,
+                                            height: 22,
+                                            borderRadius: '50%',
+                                            background: bg,
+                                            color: fg,
+                                            border: '1px solid #000',
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            lineHeight: 1,
+                                            fontFamily: 'Arial, sans-serif',
+                                            flex: 'none',
+                                        });
+                                        return (
+                                            <span
+                                                key={`hm-${i}`}
+                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                            >
+                                                <span style={stoneStyle(laterColor, laterTextColor)}>{left?.text}</span>
+                                                <span style={{ fontFamily: 'sans-serif' }}>=</span>
+                                                <span style={stoneStyle(baseColor, baseTextColor)}>{item.right.text}</span>
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            )}
 
                             {/* Footer */}
                             <div className="w-full text-center text-xs mt-auto pb-4">
