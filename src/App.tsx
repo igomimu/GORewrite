@@ -3288,7 +3288,14 @@ function App() {
                                             {showHeader && renderIntegratedHeader(printSettings, pageIdx + 1)}
 
                                             <div className={`${getGridClass(perPage)} w-full flex-grow`}>
-                                                {chunk.map((fig, i) => (
+                                                {chunk.map((fig, i) => {
+                                                    // この図に含まれる衝突手だけを抽出
+                                                    const figureLegend = hiddenMoves.filter(item => {
+                                                        const laterText = item.left[0]?.text ?? '';
+                                                        const laterNum = parseInt(laterText);
+                                                        return !isNaN(laterNum) && laterNum >= fig.moveRangeStart && laterNum <= fig.moveRangeEnd;
+                                                    });
+                                                    return (
                                                     <div key={i} className="flex flex-col items-center w-full" style={getItemStyle(perPage)}>
 
                                                         {/* Figure Info */}
@@ -3316,8 +3323,60 @@ function App() {
                                                             />
                                                         </div>
 
+                                                        {/* この図の欄外凡例 */}
+                                                        {figureLegend.length > 0 && (
+                                                            <div
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    flexWrap: 'wrap',
+                                                                    gap: '2px 8px',
+                                                                    width: '100%',
+                                                                    fontSize: 9,
+                                                                    color: '#000',
+                                                                    lineHeight: 1.4,
+                                                                    marginTop: 4,
+                                                                    pageBreakInside: 'avoid',
+                                                                }}
+                                                            >
+                                                                {figureLegend.map((item, idx) => {
+                                                                    const left = item.left[0];
+                                                                    const baseBg = item.right.color === 'BLACK' ? '#000' : '#fff';
+                                                                    const baseFg = item.right.color === 'BLACK' ? '#fff' : '#000';
+                                                                    const laterBg = left?.color === 'BLACK' ? '#000' : '#fff';
+                                                                    const laterFg = left?.color === 'BLACK' ? '#fff' : '#000';
+                                                                    const stoneStyle = (bg: string, fg: string): React.CSSProperties => ({
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        width: 18,
+                                                                        height: 18,
+                                                                        borderRadius: '50%',
+                                                                        background: bg,
+                                                                        color: fg,
+                                                                        border: '1px solid #000',
+                                                                        fontSize: 9,
+                                                                        fontWeight: 700,
+                                                                        lineHeight: 1,
+                                                                        fontFamily: 'Arial, sans-serif',
+                                                                        flex: 'none',
+                                                                    });
+                                                                    return (
+                                                                        <span
+                                                                            key={`fhm-${idx}`}
+                                                                            style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                                                                        >
+                                                                            <span style={stoneStyle(laterBg, laterFg)}>{left?.text}</span>
+                                                                            <span style={{ fontFamily: 'sans-serif' }}>=</span>
+                                                                            <span style={stoneStyle(baseBg, baseFg)}>{item.right.text}</span>
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+
                                                     </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
 
                                             {/* Footer */}
