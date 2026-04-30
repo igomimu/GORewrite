@@ -1356,7 +1356,31 @@ function App() {
         return valA - valB;
     });
 
-    const hiddenMoves = footer;
+    // Group footer entries that share the same base (right) — combine their left arrays
+    // so collisions on the same point render as [40 50 60 30] instead of [40 30][50 30][60 30]
+    const groupedFooter: typeof footer = [];
+    const groupMap = new Map<string, typeof footer[number]>();
+    footer.forEach(it => {
+        const key = `${it.right.text}|${it.right.color ?? ''}|${it.right.isLabel ? '1' : '0'}`;
+        const existing = groupMap.get(key);
+        if (existing) {
+            existing.left.push(...it.left);
+        } else {
+            const cloned = { left: [...it.left], right: it.right };
+            groupMap.set(key, cloned);
+            groupedFooter.push(cloned);
+        }
+    });
+    groupedFooter.forEach(g => {
+        g.left.sort((a, b) => (parseInt(a.text) || 0) - (parseInt(b.text) || 0));
+    });
+    groupedFooter.sort((a, b) => {
+        const va = parseInt(a.left[0]?.text) || 0;
+        const vb = parseInt(b.left[0]?.text) || 0;
+        return va - vb;
+    });
+
+    const hiddenMoves = groupedFooter;
     const specialLabels = labels;
 
 
@@ -1502,13 +1526,13 @@ function App() {
             let maxRowY = 0;
 
             hiddenMoves.forEach((item) => {
-                // Layout: VisibleStone -- [ -- HiddenStone -- ]
+                // Layout: visStone1 visStone2 ... [ HiddenStone ]
                 // Sizes: Stone Ø36.8 (r=18.4).
-                // Spacings:
-                // VisStone (40px) + Gap(5px) + Bracket(10px) + Gap(5px) + HidStone(40px) + Gap(5px) + Bracket(10px)
-                // Total Block Width approx: 115px
+                // Per-stone advance: 35px (matches inline preview in GoBoard.tsx)
 
-                const blockWidth = 145; // Fixed width for "Stone [ Stone ]" block
+                const visCount = item.left.length;
+                // Block width: vis stones (35 each) + bracket open + base stone + bracket close + padding
+                const blockWidth = 20 + visCount * 35 + 5 + 41.8 + 10 + 10;
 
                 // Wrap Check
                 if (cursorX + blockWidth > boardDisplayWidth && cursorX > 0) {
@@ -1521,15 +1545,12 @@ function App() {
                 itemG.setAttribute('transform', `translate(${cursorX}, ${cursorY})`);
 
                 // Advance cursor for next item
-                cursorX += blockWidth; // No extra gap needed if blockWidth includes padding, or add +10 here
+                cursorX += blockWidth;
 
                 let drawX = 20; // Start X in group
 
-                // 1. Visible Stone (Left)
-                // Assuming left array has 1 item for standard collisions, or multiple for multi-depth?
-                // The User image shows single visible stone. Let's take the first/last one.
-                const visStone = item.left[0]; // Usually the top one directly
-                if (visStone) {
+                // 1. Visible Stones (Left) — render all collision moves at this point
+                item.left.forEach((visStone) => {
                     const c = document.createElementNS(svgNS, 'circle');
                     c.setAttribute('cx', drawX.toString());
                     c.setAttribute('cy', '0');
@@ -1553,7 +1574,7 @@ function App() {
                     itemG.appendChild(t);
 
                     drawX += 35; // Advance past stone
-                }
+                });
 
                 // 2. Open Bracket
                 const openB = document.createElementNS(svgNS, 'text');
@@ -3159,11 +3180,8 @@ function App() {
                                     }}
                                 >
                                     {hiddenMoves.map((item, i) => {
-                                        const left = item.left[0];
                                         const baseColor = item.right.color === 'BLACK' ? '#000' : '#fff';
                                         const baseTextColor = item.right.color === 'BLACK' ? '#fff' : '#000';
-                                        const laterColor = left?.color === 'BLACK' ? '#000' : '#fff';
-                                        const laterTextColor = left?.color === 'BLACK' ? '#fff' : '#000';
                                         const stoneStyle = (bg: string, fg: string): React.CSSProperties => ({
                                             display: 'inline-flex',
                                             alignItems: 'center',
@@ -3185,7 +3203,13 @@ function App() {
                                                 key={`hm-${i}`}
                                                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
                                             >
-                                                <span style={stoneStyle(laterColor, laterTextColor)}>{left?.text}</span>
+                                                {item.left.map((stone, lidx) => {
+                                                    const lc = stone.color === 'BLACK' ? '#000' : '#fff';
+                                                    const ltc = stone.color === 'BLACK' ? '#fff' : '#000';
+                                                    return (
+                                                        <span key={`l-${lidx}`} style={stoneStyle(lc, ltc)}>{stone.text}</span>
+                                                    );
+                                                })}
                                                 <span style={{ fontFamily: 'sans-serif' }}>=</span>
                                                 <span style={stoneStyle(baseColor, baseTextColor)}>{item.right.text}</span>
                                             </span>
@@ -3289,11 +3313,14 @@ function App() {
 
                                             <div className={`${getGridClass(perPage)} w-full flex-grow`}>
                                                 {chunk.map((fig, i) => {
-                                                    // この図に含まれる衝突手だけを抽出
-                                                    const figureLegend = hiddenMoves.filter(item => {
-                                                        const laterText = item.left[0]?.text ?? '';
-                                                        const laterNum = parseInt(laterText);
-                                                        return !isNaN(laterNum) && laterNum >= fig.moveRangeStart && laterNum <= fig.moveRangeEnd;
+                                                    // この図に含まれる衝突手だけを抽出（グループ内の left も範囲で絞る）
+                                                    const figureLegend = hiddenMoves.flatMap(item => {
+                                                        const inRange = item.left.filter(s => {
+                                                            const n = parseInt(s.text);
+                                                            return !isNaN(n) && n >= fig.moveRangeStart && n <= fig.moveRangeEnd;
+                                                        });
+                                                        if (inRange.length === 0) return [];
+                                                        return [{ left: inRange, right: item.right }];
                                                     });
                                                     return (
                                                     <div key={i} className="flex flex-col items-center w-full" style={getItemStyle(perPage)}>
@@ -3339,11 +3366,8 @@ function App() {
                                                                 }}
                                                             >
                                                                 {figureLegend.map((item, idx) => {
-                                                                    const left = item.left[0];
                                                                     const baseBg = item.right.color === 'BLACK' ? '#000' : '#fff';
                                                                     const baseFg = item.right.color === 'BLACK' ? '#fff' : '#000';
-                                                                    const laterBg = left?.color === 'BLACK' ? '#000' : '#fff';
-                                                                    const laterFg = left?.color === 'BLACK' ? '#fff' : '#000';
                                                                     const stoneStyle = (bg: string, fg: string): React.CSSProperties => ({
                                                                         display: 'inline-flex',
                                                                         alignItems: 'center',
@@ -3365,7 +3389,13 @@ function App() {
                                                                             key={`fhm-${idx}`}
                                                                             style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}
                                                                         >
-                                                                            <span style={stoneStyle(laterBg, laterFg)}>{left?.text}</span>
+                                                                            {item.left.map((stone, lidx) => {
+                                                                                const lb = stone.color === 'BLACK' ? '#000' : '#fff';
+                                                                                const lf = stone.color === 'BLACK' ? '#fff' : '#000';
+                                                                                return (
+                                                                                    <span key={`l-${lidx}`} style={stoneStyle(lb, lf)}>{stone.text}</span>
+                                                                                );
+                                                                            })}
                                                                             <span style={{ fontFamily: 'sans-serif' }}>=</span>
                                                                             <span style={stoneStyle(baseBg, baseFg)}>{item.right.text}</span>
                                                                         </span>
