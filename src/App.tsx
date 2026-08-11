@@ -314,11 +314,11 @@ function App() {
                     // Delete Simple/Setup stone
                     b[y - 1][x - 1] = null;
                 } else if (!cell || (cell.number)) {
-                    // Place Black (default) if empty. 
+                    // Place the selected setup color if empty.
                     // Note: If numbered stone is there, we usually ignore or shouldn't be in Setup mode?
                     // Old logic: deleted setup stone if overlapping. Placed if not.
                     if (!cell || !cell.number) {
-                        b[y - 1][x - 1] = { color: 'BLACK' };
+                        b[y - 1][x - 1] = { color: activeColor };
                     }
                 }
             });
@@ -2897,37 +2897,25 @@ function App() {
 
                     {/* Mode Switch (Compact Icons) & Navigation */}
                     <div className="flex justify-center items-center space-x-1 border-b pb-2 flex-wrap gap-y-1 sm:gap-y-2">
-                        {/* Black Stone (Simple) */}
+                        {/* Setup Stone: click again to switch black/white */}
                         <button
-                            title={t('tooltip.placeBlack')} aria-label={t('tooltip.placeBlack')}
-                            className={`p-1.5 rounded-full transition-all ${mode === 'SIMPLE' && activeColor === 'BLACK' ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'hover:bg-gray-100 opacity-60 hover:opacity-100'}`}
+                            title={activeColor === 'BLACK' ? t('tooltip.placeBlack') : t('tooltip.placeWhite')}
+                            aria-label={activeColor === 'BLACK' ? t('tooltip.placeBlack') : t('tooltip.placeWhite')}
+                            className={`p-1.5 rounded-full transition-all ${mode === 'SIMPLE' ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'hover:bg-gray-100 opacity-60 hover:opacity-100'}`}
                             onClick={() => {
-                                setMode('SIMPLE');
                                 setToolMode('STONE');
-                                currentState.activeColor = 'BLACK';
-                                setRootNode({ ...rootNode });
-                                try { localStorage.setItem('gorw_active_color', 'BLACK'); } catch (e) { }
+                                if (mode === 'SIMPLE') {
+                                    const next = activeColor === 'BLACK' ? 'WHITE' : 'BLACK';
+                                    currentState.activeColor = next;
+                                    setRootNode({ ...rootNode });
+                                    try { localStorage.setItem('gorw_active_color', next); } catch (e) { }
+                                } else {
+                                    setMode('SIMPLE');
+                                }
                             }}
                         >
-                            <svg width="24" height="24" viewBox="0 0 24 24" className="text-black">
-                                <circle cx="12" cy="12" r="10" fill="currentColor" />
-                            </svg>
-                        </button>
-
-                        {/* White Stone (Simple) */}
-                        <button
-                            title={t('tooltip.placeWhite')} aria-label={t('tooltip.placeWhite')}
-                            className={`p-1.5 rounded-full transition-all ${mode === 'SIMPLE' && activeColor === 'WHITE' ? 'bg-blue-100 ring-2 ring-blue-500 scale-110' : 'hover:bg-gray-100 opacity-60 hover:opacity-100'}`}
-                            onClick={() => {
-                                setMode('SIMPLE');
-                                setToolMode('STONE');
-                                currentState.activeColor = 'WHITE';
-                                setRootNode({ ...rootNode });
-                                try { localStorage.setItem('gorw_active_color', 'WHITE'); } catch (e) { }
-                            }}
-                        >
-                            <svg width="24" height="24" viewBox="0 0 24 24" className="text-gray-600">
-                                <circle cx="12" cy="12" r="9.5" fill="white" stroke="currentColor" strokeWidth="1" />
+                            <svg width="24" height="24" viewBox="0 0 24 24" className={activeColor === 'BLACK' ? "text-black" : "text-gray-600"}>
+                                <circle cx="12" cy="12" r={activeColor === 'BLACK' ? "10" : "9.5"} fill={activeColor === 'BLACK' ? "currentColor" : "white"} stroke={activeColor === 'WHITE' ? "currentColor" : "none"} strokeWidth="1" />
                             </svg>
                         </button>
 
