@@ -4,7 +4,7 @@
 - [x] 配置ボタンの再押下で黒石／白石を切り替える
 - [x] 選択中の色を左クリックで配置する
 - [x] production buildで検証する
-- [ ] commit・pushを行う
+- [x] commit・pushを行う
 
 ## Review
 
@@ -12,3 +12,4 @@
 - 配置モードの左クリックは、ボタンに表示中の色を置く。既存配置石のクリックは従来どおり削除する。
 - 手順用の「1」入り石ボタンと合わせ、入力モードを2ボタンに統一した。
 - `npm run build` と `git diff --check` が成功した。
+- commit `b629a01` をorigin/masterへpushした。
